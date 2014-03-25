@@ -1,0 +1,140 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+
+my $version = "2014-03-24";
+
+my $cluster = "milou";  # -M
+my $nodes;              # -n
+my @nodes;              # after unpacking finishedjobinfo or -n
+my @jobs;               # user-specified jobids
+my $help;               # -h
+my $usage = "
+$0  [-h] -M cluster [ -n node[,node...] ] jobid [ jobid ... ]
+
+Discover jobstats for the specified job(s) on the specified cluster.  
+
+Cluster is assumed '$cluster' if not specified.  The finishedjobinfo script is
+used to discover information about the job unless the -n option is specified.
+The -n option bypasses the script and will only return jobstats files for the
+specified node(s).
+
+Note that not all jobs will produce jobstats files.  Also, if a job booked
+nodes inefficiently by not using node(s) it asked for, jobstats files will
+not be available for the booked but unused nodes.
+
+Output for each job is a tab-separated line with the following fields:
+
+  jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
+
+Field contents:
+
+  jobid    : the job ID
+  cluster  : cluster on which the job was run
+  endtime  : end time of the job (with -n, this is '.')
+  booked   : the number of booked cores (with -n, this is '.')
+  cores    : the number of cores represented in the discovered jobstats files.
+  node     : the node(s) booked for the job, expanded into individual node names,
+             separated by commas ','; if no nodes were found, this is '.'
+  jobstats : the jobstats files for the nodes, in the same order the nodes are listed,
+             separated by commas ','; if no jobstats files were found, this is '.'
+
+-M cluster         Cluster on which the job was run [default is '$cluster']
+-n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
+                   the finishedjobinfo script is not run and discovery is
+                   restricted to only the specified nodes
+-h                 This help information
+
+jobid              Job number valid on the specified cluster
+
+";
+
+GetOptions("M=s" => \$cluster, 
+           "n=s" => \$nodes,
+	   "h"   => \$help) or die "$usage";
+
+push @jobs, shift @ARGV;
+
+(! $help and $cluster and scalar(@jobs) >= 1) or die "$usage";
+
+@nodes = split /,/, $nodes if $nodes;
+
+sub jobInfo($) {
+# TODO: handle unknown jobid here, what does fji return?
+	my $jobid = shift;
+	my (undef, undef, $keyvals) = split (/ /, qx(/sw/uppmax/bin/finishedjobinfo -q -M $cluster -j $jobid), 3);
+	my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
+	return(\%h);
+}
+
+sub parseNodes($) {
+	# nodes=                                # nodes=m80
+	# nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
+	# nodes=m[57,135-137]                   # nodes=m[135-136]
+	my $nodes = shift;
+	return ( $nodes ) if $nodes !~ /\[/;  # 0 or 1 nodes
+	$nodes =~ s/^(.)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
+	my $node_prefix = $1;
+	my @node_nums;
+	foreach my $p ( split /,/, $nodes ) {
+		my @r = split /-/, $p;
+		push @node_nums, ($#r ? ($r[0] .. $r[1]) : $r[0]);
+	}
+	return map { $node_prefix . $_ } @node_nums;
+}
+sub getJobstatsFiles($$@) {  # cluster jobid node-list
+	my $cluster = shift; 
+	my $jobid = shift; 
+	my @node_list = @_;
+	print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
+	my @file_list;
+	foreach my $node ( @node_list ) {
+		my $fn = "/sw/share/slurm/$cluster/uppmax_jobstats/$node/$jobid";
+		-f $fn and -s $fn and push @file_list, $fn;
+	}
+	return @file_list;
+}
+sub getJobStatsFileNodes($) {
+	my $file = shift;
+	open(F, "<$file") or die "could not open jobstats file $file: $!";
+	scalar(<F>); # header line
+	my $l = <F>; # first data line
+	# first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
+	return scalar(split /[ \t]+/, $l) - 5;
+}
+
+foreach my $jobid ( @job ) {
+	# $cluster already declared above
+	my $endtime = '.';
+	my $booked = '.';
+	my $cores = 0;  # still need a mechanism to gather this from getJobStatsFileNodes()
+	my @node_list;
+	my @jobstats_list;
+
+	if (@nodes) {  # -n was used, use this list
+		@node_list = @nodes;
+	} else {  # discover using finishedjobinfo
+		my $ji = jobInfo($j);
+		@node_list = parseNodes($ji->{nodes});
+	}
+	@file_list = getJobstatsFiles($cluster, $jobid, @node_list);
+}
+
+if ($cluster and $node) {
+	push @file_list, getJobstatsFile($cluster, $_, $node) foreach @job;
+} else {
+	foreach my $j (@job) {
+		my $ji = jobInfo($j);
+		# Get the list of nodes for this job
+		my @node_list = parseNodes($ji->{nodes});
+		# ... and get the list of jobstats files.  There may be many 
+		# nodes but not even a single jobstat file.
+		@file_list = getJobstatsFiles($cluster, $j, @node_list);
+		print STDERR "cluster:$cluster job:$j  end_time:", $ji->{end_time}, " procs:", $ji->{procs}, "\n";
+		print STDERR "$_\n" foreach @file_list;
+	}
+}
+
