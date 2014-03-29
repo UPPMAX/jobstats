@@ -123,13 +123,13 @@ sub getJobstatsFileCoreCount($) {
 	return scalar(@f) - 5;
 }
 
-print STDERR "jobid\tcluster\tendtime\tbooked\tcores\tnode_list\tpath_to_jobstats\n" if ! $suppress_header;;
+print STDOUT "jobid\tcluster\tendtime\tbooked\tcores\tnode_list\tpath_to_jobstats\n" if ! $suppress_header;;
 # print STDERR join(" -=- ", @jobs), "\n";
 foreach my $jobid ( @jobs ) {
 	# $cluster already declared above
 	my $endtime = '.';
 	my $booked = '.';
-	my $cores = 0;  # still need a mechanism to gather this from getJobStatsFileNodes()
+	my $cores = 0;
 	my @node_list;
 	my @file_list,
 	my @jobstats_list;
@@ -146,13 +146,13 @@ foreach my $jobid ( @jobs ) {
 	$cores += getJobstatsFileCoreCount($_) foreach @file_list;
 	# jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
 	# TODO: implement heuristic flags...
-	print STDERR "$jobid";
-	print STDERR "\t$cluster";
-	print STDERR "\t$endtime";
-	print STDERR "\t$booked";
-	print STDERR "\t$cores";
-	print STDERR "\t", join(",", @node_list);
-	print STDERR "\t", join(",", @file_list);
-	print STDERR "\n";
+	print STDOUT "$jobid";
+	print STDOUT "\t$cluster";
+	print STDOUT "\t$endtime";
+	print STDOUT "\t$booked";
+	print STDOUT "\t$cores";
+	print STDOUT "\t", join(",", @node_list);
+	print STDOUT "\t", join(",", @file_list);
+	print STDOUT "\n";
 }
 
