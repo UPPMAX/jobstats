@@ -113,7 +113,7 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
 	}
 	return @file_list;
 }
-sub getJobstatsFileNodes($) {
+sub getJobstatsFileCoreCount($) {
 	my $file = shift;
 	open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
 	scalar(<F>); # header line
@@ -143,7 +143,7 @@ foreach my $jobid ( @jobs ) {
 		$booked = $ji->{procs};
 	}
 	@file_list = getJobstatsFiles($cluster, $jobid, @node_list);
-	$cores += getJobstatsFileNodes($_) foreach @file_list;
+	$cores += getJobstatsFileCoreCount($_) foreach @file_list;
 	# jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
 	# TODO: implement heuristic flags...
 	print STDERR "$jobid";
