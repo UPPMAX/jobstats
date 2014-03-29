@@ -7,13 +7,16 @@ use Getopt::Long;
 
 my $version = "2014-03-24";
 
-my $cluster = "milou";  # -M
-my $nodes;              # -n
-my @nodes;              # after unpacking finishedjobinfo or -n
-my @jobs;               # user-specified jobids
-my $help;               # -h
+my $cluster = "milou";   # -M
+my $nodes;               # -n
+my @nodes;               # after unpacking finishedjobinfo or -n
+my @jobs;                # user-specified jobids
+my $help;                # -h
+my $suppress_header = 0; # -d
+my $finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
+my $prefix = "/sw/share/slurm";                         # -p
 my $usage = "
-$0  [-h] -M cluster [ -n node[,node...] ] jobid [ jobid ... ]
+$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] jobid [ jobid ... ]
 
 Discover jobstats for the specified job(s) on the specified cluster.  
 
@@ -42,30 +45,43 @@ Field contents:
   jobstats : the jobstats files for the nodes, in the same order the nodes are listed,
              separated by commas ','; if no jobstats files were found, this is '.'
 
--M cluster         Cluster on which the job was run [default is '$cluster']
--n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
-                   the finishedjobinfo script is not run and discovery is
-                   restricted to only the specified nodes
--h                 This help information
+Options:
 
-jobid              Job number valid on the specified cluster
+    -M cluster         Cluster on which the job was run [default is '$cluster']
+    -n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
+                       the finishedjobinfo script is not run and discovery is
+                       restricted to only the specified nodes
+    -h                 This help information
+    -d                 Do not produce a header for the output
+    -p directory       Directory prefix to use for jobstats files [default is '$prefix']
+                       Directory structure is '<prefix>/<cluster>/uppmax_jobstats/<node>/i<jobid>'
+    -f file            finishedjobinfo script [default is '$finishedjobinfo']
+
+    jobid [jobid ...]  Job number valid on the specified cluster
 
 ";
 
 GetOptions("M=s" => \$cluster, 
            "n=s" => \$nodes,
+           "d"   => \$suppress_header,
+           "p=s" => \$prefix,
+           "f=s" => \$finishedjobinfo,
 	   "h"   => \$help) or die "$usage";
+die "$usage" if $help;
 
-push @jobs, shift @ARGV;
+@jobs = @ARGV;
 
-(! $help and $cluster and scalar(@jobs) >= 1) or die "$usage";
+($cluster and scalar(@jobs) >= 1) or die "\n*** At least one jobid is required.\n$usage";
+
+-d "$prefix/$cluster/uppmax_jobstats/" or die "\n*** Prefix subdirectory '$prefix/$cluster/uppmax_jobstats/' is not a directory.\n$usage";
+-f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' is not a file.\n$usage";
 
 @nodes = split /,/, $nodes if $nodes;
 
 sub jobInfo($) {
-# TODO: handle unknown jobid here, what does fji return?
-	my $jobid = shift;
-	my (undef, undef, $keyvals) = split (/ /, qx(/sw/uppmax/bin/finishedjobinfo -q -M $cluster -j $jobid), 3);
+	# TODO: handle unknown jobid here, what does fji return?
+	my $j = shift;
+	my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
 	my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
 	return(\%h);
 }
@@ -76,7 +92,7 @@ sub parseNodes($) {
 	# nodes=m[57,135-137]                   # nodes=m[135-136]
 	my $nodes = shift;
 	return ( $nodes ) if $nodes !~ /\[/;  # 0 or 1 nodes
-	$nodes =~ s/^(.)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
+	$nodes =~ s/^(.+)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
 	my $node_prefix = $1;
 	my @node_nums;
 	foreach my $p ( split /,/, $nodes ) {
@@ -89,52 +105,54 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
 	my $cluster = shift; 
 	my $jobid = shift; 
 	my @node_list = @_;
-	print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
+	# print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
 	my @file_list;
 	foreach my $node ( @node_list ) {
-		my $fn = "/sw/share/slurm/$cluster/uppmax_jobstats/$node/$jobid";
+		my $fn = "$prefix/$cluster/uppmax_jobstats/$node/$jobid";
 		-f $fn and -s $fn and push @file_list, $fn;
 	}
 	return @file_list;
 }
-sub getJobStatsFileNodes($) {
+sub getJobstatsFileNodes($) {
 	my $file = shift;
-	open(F, "<$file") or die "could not open jobstats file $file: $!";
+	open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
 	scalar(<F>); # header line
 	my $l = <F>; # first data line
 	# first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
-	return scalar(split /[ \t]+/, $l) - 5;
+	my @f = split /[ \t]+/, $l;
+	return scalar(@f) - 5;
 }
 
-foreach my $jobid ( @job ) {
+print STDERR "jobid\tcluster\tendtime\tbooked\tcores\tnode_list\tpath_to_jobstats\n" if ! $suppress_header;;
+# print STDERR join(" -=- ", @jobs), "\n";
+foreach my $jobid ( @jobs ) {
 	# $cluster already declared above
 	my $endtime = '.';
 	my $booked = '.';
 	my $cores = 0;  # still need a mechanism to gather this from getJobStatsFileNodes()
 	my @node_list;
+	my @file_list,
 	my @jobstats_list;
 
 	if (@nodes) {  # -n was used, use this list
 		@node_list = @nodes;
 	} else {  # discover using finishedjobinfo
-		my $ji = jobInfo($j);
+		my $ji = jobInfo($jobid);
 		@node_list = parseNodes($ji->{nodes});
+		$endtime = $ji->{end_time};
+		$booked = $ji->{procs};
 	}
 	@file_list = getJobstatsFiles($cluster, $jobid, @node_list);
-}
-
-if ($cluster and $node) {
-	push @file_list, getJobstatsFile($cluster, $_, $node) foreach @job;
-} else {
-	foreach my $j (@job) {
-		my $ji = jobInfo($j);
-		# Get the list of nodes for this job
-		my @node_list = parseNodes($ji->{nodes});
-		# ... and get the list of jobstats files.  There may be many 
-		# nodes but not even a single jobstat file.
-		@file_list = getJobstatsFiles($cluster, $j, @node_list);
-		print STDERR "cluster:$cluster job:$j  end_time:", $ji->{end_time}, " procs:", $ji->{procs}, "\n";
-		print STDERR "$_\n" foreach @file_list;
-	}
+	$cores += getJobstatsFileNodes($_) foreach @file_list;
+	# jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
+	# TODO: implement heuristic flags...
+	print STDERR "$jobid";
+	print STDERR "\t$cluster";
+	print STDERR "\t$endtime";
+	print STDERR "\t$booked";
+	print STDERR "\t$cores";
+	print STDERR "\t", join(",", @node_list);
+	print STDERR "\t", join(",", @file_list);
+	print STDERR "\n";
 }
 
