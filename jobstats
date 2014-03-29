@@ -74,13 +74,13 @@ die "$usage" if $help;
 ($cluster and scalar(@jobs) >= 1) or die "\n*** At least one jobid is required.\n$usage";
 
 -d "$prefix/$cluster/uppmax_jobstats/" or die "\n*** Prefix subdirectory '$prefix/$cluster/uppmax_jobstats/' is not a directory.\n$usage";
--f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' is not a file.\n$usage";
 
 @nodes = split /,/, $nodes if $nodes;
 
 sub jobInfo($) {
 	# TODO: handle unknown jobid here, what does fji return?
 	my $j = shift;
+    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' is not available";
 	my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
 	my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
 	return(\%h);
