@@ -55,7 +55,7 @@ flag_node_severely_underused.fraction = 0.25
 processArgs = function(args) {
   job = list()
   if (args[1] == "-n" || args[1] == "--no-plot") {
-    do.plot = FALSE
+    do.plot <<- FALSE
     args = args[-1]
   }
   if (args[1] == "-f" || args[1] == "--full") {
@@ -249,7 +249,7 @@ plotJobstatsPanel = function(dat, node="unknown") {
   swap.y = range.GB[2]
   # set up traces based on resource usage
   dat$x = ((dat$TIME - dat$TIME[1]) / 60) + sampling.plot.offset  # 5 minute sampling times
-  range.x = c(0, max(dat$x) + sampling.window - sampling.plot.offset)
+  range.x = c(0, max(ceiling(dat$x + sampling.window - sampling.plot.offset)))
   core.at = seq(range.cores[1], range.cores[2], by=100)
   core.labels = paste0(as.character(core.at), "%")
   core.to.GB = function(.x) return((.x / range.cores[2]) * range.GB[2])

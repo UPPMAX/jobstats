@@ -1,9 +1,5 @@
 #!/usr/bin/perl
 
-# TODO: carry through node identity without having to parse jobstats filename,
-#       perhaps by having the node list be in order of used nodes, then unused
-#       nodes... DONE using reorderNodeList()
-
 use strict;
 use warnings;
 
@@ -174,7 +170,7 @@ sub runPlotJobstats(@) {
     -f "$plot_jobstats_R" or die "\n*** plot_jobstats.R script '$plot_jobstats_R' not available";
     unshift @args, "--full";   # must be first, unless --no-plot
     unshift @args, "--no-plot" if ! $do_plot;  # must be first arg
-	my $flags = qx($plot_jobstats_R @args);
+    my $flags = qx($plot_jobstats_R @args);
     chomp $flags;
     return($flags);
 }
@@ -211,7 +207,7 @@ foreach my $jobid ( @jobs ) {
     if (@file_list and @file_list < @node_list) {
         push @flag_list, "nodes_overbooked:" . scalar(@node_list) . ":" . scalar(@file_list);
     }
-    if ($booked ne '.' and $total_cores < $booked) {
+    if (@file_list and $booked ne '.' and $total_cores < $booked) {
         push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
     }
 	# jobid cluster endtime flag-list booked cores node-list jobstats-file-list
@@ -221,13 +217,15 @@ foreach my $jobid ( @jobs ) {
     push @fields, $endtime; # 2
     push @fields, (@flag_list ? join(",", @flag_list) : "."); # 3
 	push @fields, $booked; # 4
-	push @fields, join(",", @core_list); # 5
+	push @fields, (@core_list ? join(",", @core_list) : "."); # 5
 	push @fields, join(",", @node_list); # 6
-	push @fields, join(",", @file_list); # 7
+	push @fields, (@file_list ? join(",", @file_list) : "."); # 7
 
-    # run plot_jobstats.R script to check more flags and (on option) produce a plot
-    my $pjs_flags = runPlotJobstats(@fields);
-    $fields[5] = $pjs_flags if $pjs_flags;
+    # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
+    if (@file_list) {
+        my $pjs_flags = runPlotJobstats(@fields);
+        $fields[5] = $pjs_flags if $pjs_flags;
+    }
 
     print STDOUT join("\t", @fields), "\n";
 
