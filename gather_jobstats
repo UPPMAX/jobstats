@@ -8,21 +8,32 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use File::Basename;
+use Cwd 'abs_path';
+
+my $CWD = dirname(abs_path($0));
 
 my $version = "2014-03-24";
 
 my $cluster = "milou";   # -M
+my $do_plot = 0;         # -P
 my $nodes;               # -n
 my @nodes;               # after unpacking finishedjobinfo or -n
 my @jobs;                # user-specified jobids
 my $help;                # -h
 my $suppress_header = 0; # -d
 my $finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
+my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -s
 my $prefix = "/sw/share/slurm";                         # -p
 my $usage = "
 $0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] jobid [ jobid ... ]
 
-Discover jobstats for the specified job(s) on the specified cluster.  
+Discover jobstats for the specified job(s) on the specified cluster.
+
+With the -p option, produce a plot for each jobid.  Plots contain one panel per
+booked node showing CPU and memory usage, and include lines indicating the
+usage flags.  Plots are saved to the current directory with the name
+'cluster-jobid.png'.
 
 Cluster is assumed '$cluster' if not specified.  The finishedjobinfo script is
 used to discover information about the job unless the -n option is specified.
@@ -35,18 +46,20 @@ not be available for the booked but unused nodes.
 
 Output for each job is a tab-separated line with the following fields:
 
-  jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
+  jobid cluster endtime flags booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
 
 Field contents:
 
-  jobid    : the job ID
+  jobid    : job ID
   cluster  : cluster on which the job was run
   endtime  : end time of the job (with -n, this is '.')
-  booked   : the number of booked cores (with -n, this is '.')
-  cores    : the number of cores represented in the discovered jobstats files.
-  node     : the node(s) booked for the job, expanded into individual node names,
-             separated by commas ','; if no nodes were found, this is '.'
-  jobstats : the jobstats files for the nodes, in the same order the nodes are listed,
+  flags    : flags indicating various types of resource underutilizations
+  booked   : number of booked cores (with -n, this is '.')
+  cores    : number of cores represented in the discovered jobstats files.
+  node     : node(s) booked for the job, expanded into individual node names,
+             separated by commas ','; if no nodes were found, this is '.'.  The nodes
+             for which jobstats files are available are listed first.
+  jobstats : jobstats files for the nodes, in the same order the nodes are listed,
              separated by commas ','; if no jobstats files were found, this is '.'
 
 Options:
@@ -55,11 +68,16 @@ Options:
     -n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
                        the finishedjobinfo script is not run and discovery is
                        restricted to only the specified nodes
-    -h                 This help information
+
+    -p | --plot        Produce CPU and memory usage plot for each jobid
+
     -d                 Do not produce a header for the output
-    -p directory       Directory prefix to use for jobstats files [default is '$prefix']
+
+    -x directory       Directory prefix to use for jobstats files [default is '$prefix']
                        Directory structure is '<prefix>/<cluster>/uppmax_jobstats/<node>/i<jobid>'
     -f file            finishedjobinfo script [default is '$finishedjobinfo']
+    -s file            plot_jobstats.R script [default is '$plot_jobstats_R']
+    -h                 This help information
 
     jobid [jobid ...]  Job number valid on the specified cluster
 
@@ -68,8 +86,10 @@ Options:
 GetOptions("M=s" => \$cluster, 
            "n=s" => \$nodes,
            "d"   => \$suppress_header,
-           "p=s" => \$prefix,
+           "x=s" => \$prefix,
+           "plot" => \$do_plot,
            "f=s" => \$finishedjobinfo,
+           "s=s" => \$plot_jobstats_R,
 	   "h"   => \$help) or die "$usage";
 die "$usage" if $help;
 
@@ -85,7 +105,7 @@ die "$usage" if $help;
 sub jobInfo($) {
 	# TODO: handle unknown jobid here, what does fji return?
 	my $j = shift;
-    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' is not available";
+    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' not available";
 	my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
 	my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
 	return(\%h);
@@ -149,6 +169,16 @@ sub reorderNodeList($$) {
     return(@new_node_list);
 }
 
+sub runPlotJobstats(@) {
+    my @args = @_;
+    -f "$plot_jobstats_R" or die "\n*** plot_jobstats.R script '$plot_jobstats_R' not available";
+    unshift @args, "--full";   # must be first, unless --no-plot
+    unshift @args, "--no-plot" if ! $do_plot;  # must be first arg
+	my $flags = qx($plot_jobstats_R @args);
+    chomp $flags;
+    return($flags);
+}
+
 print STDOUT "jobid\tcluster\tendtime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list\n" if ! $suppress_header;;
 # print STDERR join(" -=- ", @jobs), "\n";
 foreach my $jobid ( @jobs ) {
@@ -184,16 +214,22 @@ foreach my $jobid ( @jobs ) {
     if ($booked ne '.' and $total_cores < $booked) {
         push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
     }
-	# jobid cluster endtime flags booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
-	# TODO: implement heuristic flags...
-	print STDOUT "$jobid";
-	print STDOUT "\t$cluster";
-	print STDOUT "\t$endtime";
-    print STDOUT "\t", (@flag_list ? join(",", @flag_list) : ".");
-	print STDOUT "\t$booked";
-	print STDOUT "\t", join(",", @core_list);
-	print STDOUT "\t", join(",", @node_list);
-	print STDOUT "\t", join(",", @file_list);
-	print STDOUT "\n";
+	# jobid cluster endtime flag-list booked cores node-list jobstats-file-list
+    my @fields;
+    push @fields, $jobid;  # 0
+    push @fields, $cluster; # 1
+    push @fields, $endtime; # 2
+    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 3
+	push @fields, $booked; # 4
+	push @fields, join(",", @core_list); # 5
+	push @fields, join(",", @node_list); # 6
+	push @fields, join(",", @file_list); # 7
+
+    # run plot_jobstats.R script to check more flags and (on option) produce a plot
+    my $pjs_flags = runPlotJobstats(@fields);
+    $fields[5] = $pjs_flags if $pjs_flags;
+
+    print STDOUT join("\t", @fields), "\n";
+
 }
 
