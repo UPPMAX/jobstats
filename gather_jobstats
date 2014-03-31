@@ -1,5 +1,9 @@
 #!/usr/bin/perl
 
+# TODO: carry through node identity without having to parse jobstats filename,
+#       perhaps by having the node list be in order of used nodes, then unused
+#       nodes... DONE using reorderNodeList()
+
 use strict;
 use warnings;
 
@@ -77,6 +81,7 @@ die "$usage" if $help;
 
 @nodes = split /,/, $nodes if $nodes;
 
+# discover jobinfo using finishedjobinfo script
 sub jobInfo($) {
 	# TODO: handle unknown jobid here, what does fji return?
 	my $j = shift;
@@ -86,6 +91,7 @@ sub jobInfo($) {
 	return(\%h);
 }
 
+# parse list of nodes returned by finishedjobinfo
 sub parseNodes($) {
 	# nodes=                                # nodes=m80
 	# nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
@@ -101,6 +107,8 @@ sub parseNodes($) {
 	}
 	return map { $node_prefix . $_ } @node_nums;
 }
+
+# find jobstats files, if they exist
 sub getJobstatsFiles($$@) {  # cluster jobid node-list
 	my $cluster = shift; 
 	my $jobid = shift; 
@@ -113,6 +121,8 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
 	}
 	return @file_list;
 }
+
+# look in jobstats file for number of cores used
 sub getJobstatsFileCoreCount($) {
 	my $file = shift;
 	open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
@@ -123,13 +133,31 @@ sub getJobstatsFileCoreCount($) {
 	return scalar(@f) - 5;
 }
 
-print STDOUT "jobid\tcluster\tendtime\tbooked\tcores\tnode_list\tpath_to_jobstats\n" if ! $suppress_header;;
+# reorder node list putting nodes with jobstats files first
+sub reorderNodeList($$) {
+    my $nl = shift; my $fl = shift;
+    my @old_node_list = @{$nl};
+    my @file_list = @{$fl};
+    my @new_node_list;
+    my %seen;
+    foreach my $file ( @file_list ) {
+        my @p = split("/", $file);
+        push @new_node_list, $p[-2];  # node name
+        ++$seen{$p[-2]};
+    }
+    push @new_node_list, grep { $seen{$_} ? () : $_ } @old_node_list;
+    return(@new_node_list);
+}
+
+print STDOUT "jobid\tcluster\tendtime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list\n" if ! $suppress_header;;
 # print STDERR join(" -=- ", @jobs), "\n";
 foreach my $jobid ( @jobs ) {
 	# $cluster already declared above
 	my $endtime = '.';
 	my $booked = '.';
-	my $cores = 0;
+	my $total_cores = 0;
+	my @flag_list;
+	my @core_list;
 	my @node_list;
 	my @file_list,
 	my @jobstats_list;
@@ -143,14 +171,27 @@ foreach my $jobid ( @jobs ) {
 		$booked = $ji->{procs};
 	}
 	@file_list = getJobstatsFiles($cluster, $jobid, @node_list);
-	$cores += getJobstatsFileCoreCount($_) foreach @file_list;
-	# jobid cluster endtime booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
+    @node_list = reorderNodeList(\@node_list, \@file_list);
+    foreach ( @file_list ) {
+        my $cores = getJobstatsFileCoreCount($_);
+        $total_cores += $cores;
+        push @core_list, $cores;
+    }
+    # check flags
+    if (@file_list and @file_list < @node_list) {
+        push @flag_list, "nodes_overbooked:" . scalar(@node_list) . ":" . scalar(@file_list);
+    }
+    if ($booked ne '.' and $total_cores < $booked) {
+        push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
+    }
+	# jobid cluster endtime flags booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
 	# TODO: implement heuristic flags...
 	print STDOUT "$jobid";
 	print STDOUT "\t$cluster";
 	print STDOUT "\t$endtime";
+    print STDOUT "\t", (@flag_list ? join(",", @flag_list) : ".");
 	print STDOUT "\t$booked";
-	print STDOUT "\t$cores";
+	print STDOUT "\t", join(",", @core_list);
 	print STDOUT "\t", join(",", @node_list);
 	print STDOUT "\t", join(",", @file_list);
 	print STDOUT "\n";
