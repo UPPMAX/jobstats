@@ -126,7 +126,7 @@ plotJobstats = function(job, do.png=TRUE) {
   opa = par(no.readonly=TRUE)
   par(mfrow=c(n.rows, n.columns), oma=c(0, 0, 7, 0))
   # plot the individual panels
-  for (n in job$node_list) {
+  for (n in names(job$data_list)) {
     plotJobstatsPanel( job$data_list[[ n ]], n )
   }
   # top line: cluster jobid endtime
