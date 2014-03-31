@@ -1,6 +1,7 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/Rscript
 
-# !/usr/bin/Rscript
+#  !/usr/bin/env Rscript
+
 
 options(width=200)
 
@@ -116,7 +117,7 @@ plotJobstats = function(job, do.png=TRUE) {
   top.height = 150
   panel.height = switch (n.panels, "1"=500, "2"=250, n.rows * 250)
   height = top.height + panel.height
-  cat("width =", width, " height =", height, "\n")
+  # cat("width =", width, " height =", height, "\n")
 
 
   if (do.png)
@@ -159,7 +160,7 @@ plotJobstats = function(job, do.png=TRUE) {
   par(opa)
 
   if (do.png)
-    dev.off()
+    graphics.off()
 }
 
 plotJobstatsPanel = function(dat, node="unknown") {
@@ -213,22 +214,22 @@ plotJobstatsPanel = function(dat, node="unknown") {
 gatherAllJobstats = function(job) {
   for (i in 1:length(job$file_list)) {
     node = job$node_list[i]
-    cat("reading file for node", node, "...\n")
+    # cat("reading file for node", node, "...\n")
     job$data_list[[ node ]] = readJobstatsFile(job$file_list[i], node)
-    cat("printing data for node", node, "...\n")
-    print(job$data_list[[ node ]])
-    cat("printing attributes for data for node", node, "...\n")
-    print(attributes(job$data_list[[ node ]]))
+    # cat("printing data for node", node, "...\n")
+    # print(job$data_list[[ node ]])
+    # cat("printing attributes for data for node", node, "...\n")
+    # print(attributes(job$data_list[[ node ]]))
   }
   job$flag_list = c(job$flag_list, examineUsage(job$data_list[[1]]))
   return(job)
 }
 
 job = processArgs(commandArgs(trailingOnly = TRUE))  # fills job list
-cat("after processArgs()\n")
+# cat("after processArgs()\n")
 job = gatherAllJobstats(job)
-cat("after gatherAllJobstats(), before plotJobstats()\n")
-cat("printing job...\n")
-print(job)
-cat("creating plot...\n")
+# cat("after gatherAllJobstats(), before plotJobstats()\n")
+# cat("printing job...\n")
+# print(job)
+# cat("creating plot...\n")
 plotJobstats(job)
