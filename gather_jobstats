@@ -37,7 +37,7 @@ The -n option bypasses the script and will only return jobstats files for the
 specified node(s).
 
 Note that not all jobs will produce jobstats files.  Also, if a job booked
-nodes inefficiently by not using node(s) it asked for, jobstats files will
+nodes inefficiently by not using nodes it asked for, jobstats files will
 not be available for the booked but unused nodes.
 
 Output for each job is a tab-separated line with the following fields:
@@ -229,7 +229,7 @@ foreach my $jobid ( @jobs ) {
     # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
     if (@file_list) {
         my $pjs_flags = runPlotJobstats(@fields);
-        $fields[5] = $pjs_flags if $pjs_flags;
+        $fields[3] = $pjs_flags if $pjs_flags;
     }
 
     if (! $suppress_header) {
