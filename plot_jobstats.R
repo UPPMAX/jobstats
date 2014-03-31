@@ -111,7 +111,7 @@ examineUsage = function(dat) {
 
   num.cores = ncol(dat) - first.core.column + 1
   core.columns = first.core.column:ncol(dat)
-  cores.busy = apply(dat[, core.columns], 1, function(.x) sum(.x > 0))
+  cores.busy = apply(dat[, core.columns, drop=FALSE], 1, function(.x) sum(.x > 0))
   max.cores.busy = max(cores.busy)
   max.GB.avail = max(dat$GB_LIMIT)
   max.GB.used = max(dat$GB_USED)
@@ -135,8 +135,8 @@ examineUsage = function(dat) {
     }
   }
   flag_cores_underused = (num.cores > max.cores.busy)
-  flag_mem_underused = max.GB.used < (max.GB.avail * flag_mem_underused.fraction)
-  flag_core_mem_underused = (flag_cores_underused && (max.GB.used < core.mem.used))
+  flag_mem_underused = num.cores > 1 && max.GB.used < (max.GB.avail * flag_mem_underused.fraction)
+  flag_core_mem_underused = num.cores > 1 && (flag_cores_underused && (max.GB.used < core.mem.used))
   flag_node_half_underused = (flag_core_mem_underused && 
                               max.cores.busy <= (num.cores * flag_node_half_underused.fraction))
   flag_node_severely_underused = (flag_core_mem_underused && 
@@ -254,7 +254,7 @@ plotJobstatsPanel = function(dat, node="unknown") {
   core.labels = paste0(as.character(core.at), "%")
   core.to.GB = function(.x) return((.x / range.cores[2]) * range.GB[2])
   core.at = core.to.GB(core.at)
-  dat$core_ = core.to.GB(apply(dat[, core.columns], 1, sum))
+  dat$core_ = core.to.GB(apply(dat[, core.columns, drop=FALSE], 1, sum))
   dat$swap_ = ifelse(dat$GB_SWAP_USED > 0, swap.y, NA)
   # if just one entry, then max 5 mins, double it to make a line
   if (nrow(dat) == 1) {

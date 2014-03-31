@@ -86,7 +86,7 @@ GetOptions("M=s" => \$cluster,
            "plot" => \$do_plot,
            "f=s" => \$finishedjobinfo,
            "s=s" => \$plot_jobstats_R,
-	   "h"   => \$help) or die "$usage";
+       "h"   => \$help) or die "$usage";
 die "$usage" if $help;
 
 @jobs = @ARGV;
@@ -99,54 +99,55 @@ die "$usage" if $help;
 
 # discover jobinfo using finishedjobinfo script
 sub jobInfo($) {
-	# TODO: handle unknown jobid here, what does fji return?
-	my $j = shift;
+    # TODO: handle unknown jobid here, what does fji return?
+    my $j = shift;
     -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' not available";
-	my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
-	my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
-	return(\%h);
+    my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
+    return(0) if (! defined($keyvals));
+    my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
+    return(\%h);
 }
 
 # parse list of nodes returned by finishedjobinfo
 sub parseNodes($) {
-	# nodes=                                # nodes=m80
-	# nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
-	# nodes=m[57,135-137]                   # nodes=m[135-136]
-	my $nodes = shift;
-	return ( $nodes ) if $nodes !~ /\[/;  # 0 or 1 nodes
-	$nodes =~ s/^(.+)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
-	my $node_prefix = $1;
-	my @node_nums;
-	foreach my $p ( split /,/, $nodes ) {
-		my @r = split /-/, $p;
-		push @node_nums, ($#r ? ($r[0] .. $r[1]) : $r[0]);
-	}
-	return map { $node_prefix . $_ } @node_nums;
+    # nodes=                                # nodes=m80
+    # nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
+    # nodes=m[57,135-137]                   # nodes=m[135-136]
+    my $nodes = shift;
+    return ( $nodes ) if $nodes !~ /\[/;  # 0 or 1 nodes
+    $nodes =~ s/^(.+)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
+    my $node_prefix = $1;
+    my @node_nums;
+    foreach my $p ( split /,/, $nodes ) {
+        my @r = split /-/, $p;
+        push @node_nums, ($#r ? ($r[0] .. $r[1]) : $r[0]);
+    }
+    return map { $node_prefix . $_ } @node_nums;
 }
 
 # find jobstats files, if they exist
 sub getJobstatsFiles($$@) {  # cluster jobid node-list
-	my $cluster = shift; 
-	my $jobid = shift; 
-	my @node_list = @_;
-	# print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
-	my @file_list;
-	foreach my $node ( @node_list ) {
-		my $fn = "$prefix/$cluster/uppmax_jobstats/$node/$jobid";
-		-f $fn and -s $fn and push @file_list, $fn;
-	}
-	return @file_list;
+    my $cluster = shift; 
+    my $jobid = shift; 
+    my @node_list = @_;
+    # print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
+    my @file_list;
+    foreach my $node ( @node_list ) {
+        my $fn = "$prefix/$cluster/uppmax_jobstats/$node/$jobid";
+        -f $fn and -s $fn and push @file_list, $fn;
+    }
+    return @file_list;
 }
 
 # look in jobstats file for number of cores used
 sub getJobstatsFileCoreCount($) {
-	my $file = shift;
-	open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
-	scalar(<F>); # header line
-	my $l = <F>; # first data line
-	# first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
-	my @f = split /[ \t]+/, $l;
-	return scalar(@f) - 5;
+    my $file = shift;
+    open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
+    scalar(<F>); # header line
+    my $l = <F>; # first data line
+    # first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
+    my @f = split /[ \t]+/, $l;
+    return scalar(@f) - 5;
 }
 
 # reorder node list putting nodes with jobstats files first
@@ -175,28 +176,32 @@ sub runPlotJobstats(@) {
     return($flags);
 }
 
-print STDOUT "jobid\tcluster\tendtime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list\n" if ! $suppress_header;;
-# print STDERR join(" -=- ", @jobs), "\n";
-foreach my $jobid ( @jobs ) {
-	# $cluster already declared above
-	my $endtime = '.';
-	my $booked = '.';
-	my $total_cores = 0;
-	my @flag_list;
-	my @core_list;
-	my @node_list;
-	my @file_list,
-	my @jobstats_list;
+my $header = "jobid\tcluster\tendtime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
 
-	if (@nodes) {  # -n was used, use this list
-		@node_list = @nodes;
-	} else {  # discover using finishedjobinfo
-		my $ji = jobInfo($jobid);
-		@node_list = parseNodes($ji->{nodes});
-		$endtime = $ji->{end_time};
-		$booked = $ji->{procs};
-	}
-	@file_list = getJobstatsFiles($cluster, $jobid, @node_list);
+foreach my $jobid ( @jobs ) {
+    # $cluster already declared above
+    my $endtime = '.';
+    my $booked = '.';
+    my $total_cores = 0;
+    my @flag_list;
+    my @core_list;
+    my @node_list;
+    my @file_list,
+    my @jobstats_list;
+
+    if (@nodes) {  # -n was used, use this list
+        @node_list = @nodes;
+    } else {  # discover using finishedjobinfo
+        my $ji = jobInfo($jobid);
+        if (! $ji) {  # couldn't find jobinfo, give error and skip to next
+            print STDERR "*** Jobid $jobid cannot be found on cluster '$cluster'\n";
+            next;
+        }
+        @node_list = parseNodes($ji->{nodes});
+        $endtime = $ji->{end_time};
+        $booked = $ji->{procs};
+    }
+    @file_list = getJobstatsFiles($cluster, $jobid, @node_list);
     @node_list = reorderNodeList(\@node_list, \@file_list);
     foreach ( @file_list ) {
         my $cores = getJobstatsFileCoreCount($_);
@@ -210,16 +215,16 @@ foreach my $jobid ( @jobs ) {
     if (@file_list and $booked ne '.' and $total_cores < $booked) {
         push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
     }
-	# jobid cluster endtime flag-list booked cores node-list jobstats-file-list
+    # jobid cluster endtime flag-list booked cores node-list jobstats-file-list
     my @fields;
     push @fields, $jobid;  # 0
     push @fields, $cluster; # 1
     push @fields, $endtime; # 2
     push @fields, (@flag_list ? join(",", @flag_list) : "."); # 3
-	push @fields, $booked; # 4
-	push @fields, (@core_list ? join(",", @core_list) : "."); # 5
-	push @fields, join(",", @node_list); # 6
-	push @fields, (@file_list ? join(",", @file_list) : "."); # 7
+    push @fields, $booked; # 4
+    push @fields, (@core_list ? join(",", @core_list) : "."); # 5
+    push @fields, join(",", @node_list); # 6
+    push @fields, (@file_list ? join(",", @file_list) : "."); # 7
 
     # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
     if (@file_list) {
@@ -227,6 +232,10 @@ foreach my $jobid ( @jobs ) {
         $fields[5] = $pjs_flags if $pjs_flags;
     }
 
+    if (! $suppress_header) {
+        print STDOUT $header, "\n";
+        $suppress_header = 1;  # don't print the header until we actually need it
+    }
     print STDOUT join("\t", @fields), "\n";
 
 }
