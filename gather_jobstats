@@ -1,5 +1,8 @@
 #!/usr/bin/perl
 
+# TODO: work by accepting finishedjobinfo output from stdin
+# TODO: integrate stdin into main discovery loop
+
 use strict;
 use warnings;
 
@@ -17,12 +20,13 @@ my $nodes;               # -n
 my @nodes;               # after unpacking finishedjobinfo or -n
 my @jobs;                # user-specified jobids
 my $help;                # -h
+my $stdin = 0;           # -- which indicates accepting finishedjobinfo info on stdin
 my $suppress_header = 0; # -d
 my $finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
 my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -s
 my $prefix = "/sw/share/slurm";                         # -p
 my $usage = "
-$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] jobid [ jobid ... ]
+$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] [ jobid [ jobid ... ] | -- ]
 
 Discover jobstats for the specified job(s) on the specified cluster.
 
@@ -31,11 +35,25 @@ booked node showing CPU and memory usage, and include lines indicating the
 usage flags.  Plots are saved to the current directory with the name
 'cluster-jobid.png'.
 
-Cluster is assumed '$cluster' if not specified.  The finishedjobinfo script is
-used to discover information about the job unless the -n option is specified.
-The -n option bypasses the script and will only return jobstats files for the
-specified node(s).
+Cluster is assumed '$cluster' if not specified.  There are three distinct modes
+for discovery about jobs of interest.
 
+  1. finishedjobinfo is used to discover information about jobs
+
+         $0 -M milou jobid1 jobid2 jobid3
+
+  2. If the -n option is specified, then finishedjobinfo is not called and 
+     jobstats files are sought for only the specified nodes
+
+         $0 -M milou -n m15,m16 jobid1
+    
+  3. Standard input is output from finishedjobinfo, which is then parsed for
+     discovery.  Jobids examined are those present in the input.  This mode
+     is enabled by using the -- option and providing appropriate input on stdin,
+     e.g.,
+
+         finishedjobinfo my-project | $0 -M tintin -- -p
+  
 Note that not all jobs will produce jobstats files.  Also, if a job booked
 nodes inefficiently by not using nodes it asked for, jobstats files will
 not be available for the booked but unused nodes.
@@ -79,33 +97,40 @@ Options:
 
 ";
 
-GetOptions("M=s" => \$cluster, 
-           "n=s" => \$nodes,
-           "d"   => \$suppress_header,
-           "x=s" => \$prefix,
+GetOptions("M=s"  => \$cluster, 
+           "n=s"  => \$nodes,
+           "d"    => \$suppress_header,
+           "x=s"  => \$prefix,
            "plot" => \$do_plot,
-           "f=s" => \$finishedjobinfo,
-           "s=s" => \$plot_jobstats_R,
-       "h"   => \$help) or die "$usage";
+           "f=s"  => \$finishedjobinfo,
+           "s=s"  => \$plot_jobstats_R,
+           "s=s"  => \$plot_jobstats_R,
+           ""     => \$stdin,
+           "help" => \$help) or die "$usage";
 die "$usage" if $help;
 
 @jobs = @ARGV;
 
-($cluster and scalar(@jobs) >= 1) or die "\n*** At least one jobid is required.\n$usage";
+($cluster and ($stdin or scalar(@jobs) >= 1)) or die "\n*** At least one jobid is required.\n$usage";
 
 -d "$prefix/$cluster/uppmax_jobstats/" or die "\n*** Prefix subdirectory '$prefix/$cluster/uppmax_jobstats/' is not a directory.\n$usage";
 
 @nodes = split /,/, $nodes if $nodes;
 
-# discover jobinfo using finishedjobinfo script
-sub jobInfo($) {
-    # TODO: handle unknown jobid here, what does fji return?
-    my $j = shift;
-    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' not available";
-    my (undef, undef, $keyvals) = split (/ /, qx($finishedjobinfo -q -M $cluster -j $j), 3);
+# parse a single finishedjobinfo-formatted line and return a hash
+sub parseFinishedjobinfoLine($) {
+    my $line = shift;
+    my (undef, undef, $keyvals) = split (/ /, $line, 3);
     return(0) if (! defined($keyvals));
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
     return(\%h);
+}
+
+# discover jobinfo for a single job using finishedjobinfo script
+sub jobInfo($) {
+    my $j = shift;
+    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' not available";
+    return parseFinishedjobinfoLine(qx($finishedjobinfo -q -M $cluster -j $j));
 }
 
 # parse list of nodes returned by finishedjobinfo
