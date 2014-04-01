@@ -2,7 +2,16 @@
 
 #  !/usr/bin/env Rscript
 
-options(width=200)
+# see processArgs() for command-line argument structure
+
+.version = "2014-04-01"
+
+# TODO: decide what to do about multiple-node jobs with respect to examineUsage()
+# TODO: implement Getopt::Long or some sort of argument processing
+# TODO: set limits below using arguments
+# TODO: better documentation
+
+options(width=500)
 
 do.plot = TRUE  # produce the plot
 col.GB = "black";  lty.GB = 1  # memory lines
@@ -17,23 +26,14 @@ sampling.window = 5
 
 # first column in jobstats file for core usage
 first.core.column = 6  
-# sizes of available nodes for determining misbooking
-# assumes sorted in increasing mem size
+# sizes of available nodes for determining misbooking, sorted in increasing mem size
 node.types = list(milou= c(mem128GB=128, mem256GB=256, mem512GB=512), milou.default="mem128GB",  
                   kalkyl=c(mem24GB=24, mem48GB=48,  mem72GB=72),      kalkyl.default="mem24GB",
                   tintin=c(mem64GB=64, mem128GB=128),                 tintin.default="mem64GB")
 
-# DONE: handle plot
-# DONE: handle plot with just single data point
-# DONE: carry through node identity (see jobstats Perl script TODO)
-# DONE: wrap flags line
-# DONE: add handling of booking too large a node (fat when just 128gb was required)
-# TODO: decide what to do about multiple-node jobs with respect to examineUsage()
-# TODO: implement Getopt::Long or some sort of argument processing
-# TODO: set limits below using arguments
-# TODO: make sure general enough to be called directly with jobstats files, if
-#       we don't know the node we can always include the filename
-
+main.line = 5
+main.cex = 1.8
+main.sep = "  "
 flags.line = 2
 flags.sep = "   "
 flags.line.sep = "\n"
@@ -43,13 +43,6 @@ flags.cex = 1.2
 flag_mem_underused.fraction = 0.25
 flag_node_half_underused.fraction = 0.5
 flag_node_severely_underused.fraction = 0.25
-
-# plot_jobstats.R
-
-# arguments are lines produced by 'jobstats' perl script
-
-.version = "2014-03-31"
-
 
 # process command-line args
 processArgs = function(args) {
@@ -62,15 +55,16 @@ processArgs = function(args) {
     # a full column-wise set of args as produced by the jobstats Perl script
     job$data_type = "full"
     args = args[-1]
-    # jobid cluster endtime flags coresbooked core_list node_list jobstats_file_list
+    # jobid cluster endtime runtime flags coresbooked core_list node_list jobstats_file_list
     job$jobid = as.integer(args[1])
     job$cluster = as.character(args[2])
     job$endtime = as.character(args[3])
-    job$flag_list = if (args[4] == ".") character(0) else unlist(strsplit(args[4], ",", fixed=TRUE))
-    job$booked = if (args[5] == ".") NA else as.integer(args[5])
-    job$core_list = as.integer(unlist(strsplit(args[6], ",", fixed=TRUE)))
-    job$node_list = unlist(strsplit(args[7], ",", fixed=TRUE))
-    job$file_list = unlist(strsplit(args[8], ",", fixed=TRUE))
+    job$runtime = as.character(args[4])
+    job$flag_list = if (args[5] == ".") character(0) else unlist(strsplit(args[5], ",", fixed=TRUE))
+    job$booked = if (args[6] == ".") NA else as.integer(args[6])
+    job$core_list = as.integer(unlist(strsplit(args[7], ",", fixed=TRUE)))
+    job$node_list = unlist(strsplit(args[8], ",", fixed=TRUE))
+    job$file_list = unlist(strsplit(args[9], ",", fixed=TRUE))
   } else {
     # arguments are a list of jobstats files
     job$data_type = "file"
@@ -88,7 +82,8 @@ processArgs = function(args) {
 readJobstatsFile = function(file, node="unknown") {
   dat = read.table(file, header=FALSE, skip=1)
   num.cores = ncol(dat) - first.core.column + 1
-  names(dat) = c("LOCALTIME","TIME","GB_LIMIT","GB_USED","GB_SWAP_USED",paste0("core",1:num.cores))
+  names(dat) = c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_SWAP_USED",
+                 paste0("core", 1:num.cores))
   attr(dat, "file") = file
   attr(dat, "node") = node
   return(dat)
@@ -161,18 +156,14 @@ examineUsage = function(dat) {
 # Plot a full set of jobstats panels.  Could be just 1
 plotJobstats = function(job, do.png=TRUE) {
 
-  # TODO: switch this to one panel per node, used or not
   # calculate plot size and layout
   n.panels = length(job$node_list)
   n.jobstats = length(names(job$data_list))
-  #n.panels = length(names(job$data_list))
-  if (.debug) cat("n.panels =",n.panels,"\n")
-  if (.debug) cat("n.jobstats =",n.jobstats,"\n")
+  if (.debug) cat("n.panels =", n.panels, " n.jobstats =", n.jobstats, "\n")
 
   n.columns = if (n.panels > 1) 2 else 1
   n.rows = if (n.panels > 1) as.integer(n.panels / 2 + 0.5) else 1
-  if (.debug) cat("n.columns =",n.columns,"\n")
-  if (.debug) cat("n.rows =",n.rows,"\n")
+  if (.debug) cat("n.columns =", n.columns, " n.rows =", n.rows, "\n")
   width = 800
   top.height = 150
   panel.height = switch (n.panels, "1"=500, "2"=250, n.rows * 250)
@@ -198,11 +189,14 @@ plotJobstats = function(job, do.png=TRUE) {
     }
   }
 
-  # Header lines: top line: cluster jobid endtime
-  txt = paste(job$cluster, "  jobid:", job$jobid)
+  # Header lines: top line: cluster jobid endtime runtime
+  txt = paste(job$jobid, "on", paste0("'", job$cluster, "'"))
   if (! is.null(job$endtime) && job$endtime != ".") 
-    txt = paste(txt, "  endtime:", job$endtime)
-  mtext(txt, font=2, cex=2, line=5, side=3, outer=TRUE)
+    txt = paste(sep=main.sep, txt, paste("end:", job$endtime))
+  if (! is.null(job$runtime) && job$runtime != ".") 
+    txt = paste(sep=main.sep, txt, paste("runtime:", job$runtime))
+  mtext(txt, font=2, cex=main.cex, line=main.line, side=3, outer=TRUE)
+
   # Second line: flags in red
   flags.header = if (n.panels > 1) paste("Flags (based on node", job$node_list[1], "only):") else "Flags:"
   flags.list = character(0)
@@ -302,7 +296,7 @@ if (FALSE && .debug) { cat("after processArgs()\n"); print(job) }
 job = gatherAllJobstats(job)
 if (.debug) { cat("after gatherAllJobstats()\n"); print(job) }
 
-#  TODO: return list of flags 
+#  return list of flags 
 if (do.flags) {
   write(paste(collapse=",", job$flag_list), stdout())
 }

@@ -2,6 +2,8 @@
 
 # TODO: work by accepting finishedjobinfo output from stdin
 # TODO: integrate stdin into main discovery loop
+# DONE: no header by default, invert meaning of -d
+# TODO: add -q option for no table output
 
 use strict;
 use warnings;
@@ -21,12 +23,14 @@ my @nodes;               # after unpacking finishedjobinfo or -n
 my @jobs;                # user-specified jobids
 my $help;                # -h
 my $stdin = 0;           # -- which indicates accepting finishedjobinfo info on stdin
-my $suppress_header = 0; # -d
+my $print_header = 0;    # -d
+my $quiet = 0;           # -q
 my $finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
 my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -s
-my $prefix = "/sw/share/slurm";                         # -p
+my $prefix = "/sw/share/slurm"; # -x
+my $hard_prefix = "";    # -X
 my $usage = "
-$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] [ jobid [ jobid ... ] | -- ]
+$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] [ jobid [ jobid ... ] | - ]
 
 Discover jobstats for the specified job(s) on the specified cluster.
 
@@ -49,10 +53,10 @@ for discovery about jobs of interest.
     
   3. Standard input is output from finishedjobinfo, which is then parsed for
      discovery.  Jobids examined are those present in the input.  This mode
-     is enabled by using the -- option and providing appropriate input on stdin,
+     is enabled by using the - option and providing appropriate input on stdin,
      e.g.,
 
-         finishedjobinfo my-project | $0 -M tintin -- -p
+       finishedjobinfo my-project | grep 'jobstat=COMPLETED' | $0 -M milou - -q -p
   
 Note that not all jobs will produce jobstats files.  Also, if a job booked
 nodes inefficiently by not using nodes it asked for, jobstats files will
@@ -60,13 +64,14 @@ not be available for the booked but unused nodes.
 
 Output for each job is a tab-separated line with the following fields:
 
-  jobid cluster endtime flags booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
+  jobid cluster endtime runtime flags booked cores node[,node...] /path/to/jobstats[,/path/to/jobstats...] 
 
 Field contents:
 
   jobid    : job ID
   cluster  : cluster on which the job was run
   endtime  : end time of the job (with -n, this is '.')
+  runtime  : runtime of the job (with -n, this is '.')
   flags    : flags indicating various types of resource underutilizations
   booked   : number of booked cores (with -n, this is '.')
   cores    : number of cores represented in the discovered jobstats files.
@@ -81,14 +86,24 @@ Options:
     -M cluster         Cluster on which the job was run [default is '$cluster']
     -n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
                        the finishedjobinfo script is not run and discovery is
-                       restricted to only the specified nodes
+                       restricted to only the specified nodes.  Nodes can be specified
+                       as a comma-separated list of complete node names, or using the
+                       finishedjobinfo syntax:
+                             m78,m90,m91,m92,m100  or  m[78,90-92,100]
+                       Nonsensical results will occur if the syntaxes are mixed.
+    - | --stdin        Accept input on stdin formatted like finishedjobinfo output.
+                       The short form of this option is a single dash '-'.
 
     -p | --plot        Produce CPU and memory usage plot for each jobid
 
-    -d                 Do not produce a header for the output
+    -d                 Produce a header for table output
+    -q                 Do not produce table output.  If -p is not specified, then the
+                       script produces no output but still continues with discovery.
 
     -x directory       Directory prefix to use for jobstats files [default is '$prefix']
-                       Directory structure is '<prefix>/<cluster>/uppmax_jobstats/<node>/i<jobid>'
+                       Directory structure is '<prefix>/<cluster>/uppmax_jobstats/<node>/<jobid>'
+    -X directory       Hard directory prefix to use for jobstats files.  Jobstats files
+                       are assumed available directly: '<hard-prefix>/<jobid>'
     -f file            finishedjobinfo script [default is '$finishedjobinfo']
     -s file            plot_jobstats.R script [default is '$plot_jobstats_R']
     -h                 This help information
@@ -97,15 +112,17 @@ Options:
 
 ";
 
-GetOptions("M=s"  => \$cluster, 
-           "n=s"  => \$nodes,
-           "d"    => \$suppress_header,
-           "x=s"  => \$prefix,
-           "plot" => \$do_plot,
-           "f=s"  => \$finishedjobinfo,
-           "s=s"  => \$plot_jobstats_R,
-           "s=s"  => \$plot_jobstats_R,
-           ""     => \$stdin,
+GetOptions("M=s"   => \$cluster, 
+           "n=s"   => \$nodes,
+           "d"     => \$print_header,
+           "q"     => \$quiet,
+           "x=s"   => \$prefix,
+           "X=s"   => \$hard_prefix,
+           "plot"  => \$do_plot,
+           "f=s"   => \$finishedjobinfo,
+           "s=s"   => \$plot_jobstats_R,
+           ""      => \$stdin,
+           "stdin" => \$stdin,
            "help" => \$help) or die "$usage";
 die "$usage" if $help;
 
@@ -113,13 +130,24 @@ die "$usage" if $help;
 
 ($cluster and ($stdin or scalar(@jobs) >= 1)) or die "\n*** At least one jobid is required.\n$usage";
 
--d "$prefix/$cluster/uppmax_jobstats/" or die "\n*** Prefix subdirectory '$prefix/$cluster/uppmax_jobstats/' is not a directory.\n$usage";
+my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" );
 
-@nodes = split /,/, $nodes if $nodes;
+-d "$PREFIX" or die "\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n$usage";
+
+sub parseFinishedjobinfoLine($);
+sub jobInfo($);
+sub parseNodes($);
+sub getJobstatsFiles($$@);
+sub getJobstatsFileCoreCount($);
+sub reorderNodeList($$);
+sub runPlotJobstats(@);
+
+@nodes = parseNodes($nodes) if $nodes;
 
 # parse a single finishedjobinfo-formatted line and return a hash
 sub parseFinishedjobinfoLine($) {
     my $line = shift;
+    chomp $line;
     my (undef, undef, $keyvals) = split (/ /, $line, 3);
     return(0) if (! defined($keyvals));
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
@@ -133,13 +161,17 @@ sub jobInfo($) {
     return parseFinishedjobinfoLine(qx($finishedjobinfo -q -M $cluster -j $j));
 }
 
-# parse list of nodes returned by finishedjobinfo
+# parse list of nodes returned by finishedjobinfo or provided on -n
 sub parseNodes($) {
+    my $nodes = shift;
     # nodes=                                # nodes=m80
     # nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
     # nodes=m[57,135-137]                   # nodes=m[135-136]
-    my $nodes = shift;
-    return ( $nodes ) if $nodes !~ /\[/;  # 0 or 1 nodes
+    # nodes=m2,m3,m4,m5
+    # nonsensical results if finishedjobinfo-style and comma-separated are mixed
+    if ($nodes !~ /\[/) { # 0 or 1 nodes or comma-separated
+        return ( $nodes =~ /,/ ? split(/,/, $nodes) : $nodes ); 
+    }
     $nodes =~ s/^(.+)\[(.*)\]$/$2/g;  # strip off 'prefix'[ and ]
     my $node_prefix = $1;
     my @node_nums;
@@ -158,7 +190,7 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
     # print STDERR "cluster:$cluster jobid:$jobid nodelist:", join(",", @node_list), "\n";
     my @file_list;
     foreach my $node ( @node_list ) {
-        my $fn = "$prefix/$cluster/uppmax_jobstats/$node/$jobid";
+        my $fn = ( $hard_prefix ? "$PREFIX/$jobid" : "$PREFIX/$node/$jobid" );
         -f $fn and -s $fn and push @file_list, $fn;
     }
     return @file_list;
@@ -201,11 +233,26 @@ sub runPlotJobstats(@) {
     return($flags);
 }
 
-my $header = "jobid\tcluster\tendtime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
+my $header = "jobid\tcluster\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
 
-foreach my $jobid ( @jobs ) {
+# loop either through jobids or lines of stdin
+
+while ( 1 ) {
+
+    my $jobid;
+    my $input_line;
+
+    if ($stdin) {
+        $input_line = <>;
+        last if ! $input_line;
+    } else {
+        last if ! @jobs;
+        $jobid = shift @jobs;
+    }
+
     # $cluster already declared above
     my $endtime = '.';
+    my $runtime = '.';
     my $booked = '.';
     my $total_cores = 0;
     my @flag_list;
@@ -216,14 +263,22 @@ foreach my $jobid ( @jobs ) {
 
     if (@nodes) {  # -n was used, use this list
         @node_list = @nodes;
-    } else {  # discover using finishedjobinfo
-        my $ji = jobInfo($jobid);
-        if (! $ji) {  # couldn't find jobinfo, give error and skip to next
-            print STDERR "*** Jobid $jobid cannot be found on cluster '$cluster'\n";
-            next;
+    } else {  # discover using finishedjobinfo or stdin
+        my $ji;
+        if ($stdin) {
+            $ji = parseFinishedjobinfoLine($input_line);
+            die "*** Jobid cannot be found, inconsistency in stdin input" if ! $ji;
+            $jobid = $ji->{jobid};
+        } else {
+            $ji = jobInfo($jobid);
+            if (! $ji) {  # couldn't find jobinfo, give error and skip to next
+                print STDERR "*** Jobid $jobid cannot be found\n";
+                next;
+            }
         }
         @node_list = parseNodes($ji->{nodes});
         $endtime = $ji->{end_time};
+        $runtime = $ji->{runtime};
         $booked = $ji->{procs};
     }
     @file_list = getJobstatsFiles($cluster, $jobid, @node_list);
@@ -240,28 +295,29 @@ foreach my $jobid ( @jobs ) {
     if (@file_list and $booked ne '.' and $total_cores < $booked) {
         push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
     }
-    # jobid cluster endtime flag-list booked cores node-list jobstats-file-list
+    # jobid cluster endtime runtime flag-list booked cores node-list jobstats-file-list
     my @fields;
     push @fields, $jobid;  # 0
     push @fields, $cluster; # 1
     push @fields, $endtime; # 2
-    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 3
-    push @fields, $booked; # 4
-    push @fields, (@core_list ? join(",", @core_list) : "."); # 5
-    push @fields, join(",", @node_list); # 6
-    push @fields, (@file_list ? join(",", @file_list) : "."); # 7
+    push @fields, $runtime; # 3
+    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 4
+    push @fields, $booked; # 5
+    push @fields, (@core_list ? join(",", @core_list) : "."); # 6
+    push @fields, join(",", @node_list); # 7
+    push @fields, (@file_list ? join(",", @file_list) : "."); # 8
 
     # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
     if (@file_list) {
         my $pjs_flags = runPlotJobstats(@fields);
-        $fields[3] = $pjs_flags if $pjs_flags;
+        $fields[4] = $pjs_flags if $pjs_flags;
     }
 
-    if (! $suppress_header) {
-        print STDOUT $header, "\n";
-        $suppress_header = 1;  # don't print the header until we actually need it
+    if ($print_header) {  # don't print the header until ready to create output
+        print STDOUT $header, "\n" if ! $quiet;
+        $print_header = 0;
     }
-    print STDOUT join("\t", @fields), "\n";
+    print STDOUT join("\t", @fields), "\n" if ! $quiet;
 
 }
 
