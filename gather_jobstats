@@ -1,5 +1,6 @@
 #!/usr/bin/perl
 
+# TODO: limit non-staff usage to user's own projects
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
@@ -11,8 +12,9 @@ use File::Basename;
 use Cwd 'abs_path';
 
 my $CWD = dirname(abs_path($0));
+my $NAME = basename($0);
 
-my $version = "2014-04-01";
+my $version = "2014-04-02";
 
 my $cluster = "milou";   # -M
 my $do_plot = 0;         # -P
@@ -28,7 +30,7 @@ my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -s
 my $prefix = "/sw/share/slurm"; # -x
 my $hard_prefix = "";    # -X
 my $usage = "
-$0  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] [ jobid [ jobid ... ] | - ]
+$NAME  [-h] [ -p dir ] [ -f file] -M cluster [ -n node[,node...] ] [ jobid [ jobid ... ] | - ]
 
 Discover jobstats for the specified job(s) on the specified cluster.
 
@@ -42,19 +44,19 @@ for discovery about jobs of interest.
 
   1. finishedjobinfo is used to discover information about jobs
 
-         $0 -M milou jobid1 jobid2 jobid3
+         $NAME -M milou jobid1 jobid2 jobid3
 
   2. If the -n option is specified, then finishedjobinfo is not called and 
      jobstats files are sought for only the specified nodes
 
-         $0 -M milou -n m15,m16 jobid1
+         $NAME -M milou -n m15,m16 jobid1
     
   3. Standard input is output from finishedjobinfo, which is then parsed for
      discovery.  Jobids examined are those present in the input.  This mode
      is enabled by using the - option and providing appropriate input on stdin,
      e.g.,
 
-       finishedjobinfo my-project | grep 'jobstat=COMPLETED' | $0 -M milou - -q -p
+       finishedjobinfo my-project | grep 'jobstat=COMPLETED' | $NAME -M milou - -q -p
   
 Note that not all jobs will produce jobstats files.  Also, if a job booked
 nodes inefficiently by not using nodes it asked for, jobstats files will
@@ -131,6 +133,13 @@ die "$usage" if $help;
 my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" );
 
 -d "$PREFIX" or die "\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n$usage";
+
+my $username = scalar getpwuid $<;
+my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
+my $in_staff = scalar(grep /^staff$/, @user_groups) or $user eq "root";
+print STDERR "username = $username\n";
+print STDERR "groups = ", join(':', @user_groups), "\n";
+print STDERR "in_staff = $in_staff\n";
 
 sub parseFinishedjobinfoLine($);
 sub jobInfo($);
@@ -233,8 +242,6 @@ sub runPlotJobstats(@) {
 
 my $header = "jobid\tcluster\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
 
-# loop either through jobids or lines of stdin
-
 while ( 1 ) {
 
     my $jobid;
@@ -271,6 +278,10 @@ while ( 1 ) {
             $ji = jobInfo($jobid);
             if (! $ji) {  # couldn't find jobinfo, give error and skip to next
                 print STDERR "*** Jobid $jobid cannot be found\n";
+                next;
+            }
+            if (! scalar(grep /^$ji->{account}$/, @user_groups)) {
+                print STDERR "*** Please, do not check other projects (jobid $jobid in $ji->{account})\n";
                 next;
             }
         }
