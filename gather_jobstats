@@ -1,20 +1,20 @@
 #!/usr/bin/perl
 
-# TODO: limit non-staff usage to user's own projects
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
+my $version = "2014-04-02";
+
 use strict;
 use warnings;
+# use diagnostics;
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use File::Basename;
 use Cwd 'abs_path';
 
 my $CWD = dirname(abs_path($0));
 my $NAME = basename($0);
-
-my $version = "2014-04-02";
 
 my $cluster = "milou";   # -M
 my $do_plot = 0;         # -P
@@ -110,6 +110,8 @@ Options:
 
     jobid [jobid ...]  Job number valid on the specified cluster
 
+Location: $0
+Version:  $version
 ";
 
 GetOptions("M=s"   => \$cluster, 
@@ -136,10 +138,7 @@ my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" 
 
 my $username = scalar getpwuid $<;
 my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
-my $in_staff = scalar(grep /^staff$/, @user_groups) or $user eq "root";
-print STDERR "username = $username\n";
-print STDERR "groups = ", join(':', @user_groups), "\n";
-print STDERR "in_staff = $in_staff\n";
+my $in_staff = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
 
 sub parseFinishedjobinfoLine($);
 sub jobInfo($);
@@ -280,7 +279,7 @@ while ( 1 ) {
                 print STDERR "*** Jobid $jobid cannot be found\n";
                 next;
             }
-            if (! scalar(grep /^$ji->{account}$/, @user_groups)) {
+            if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
                 print STDERR "*** Please, do not check other projects (jobid $jobid in $ji->{account})\n";
                 next;
             }
