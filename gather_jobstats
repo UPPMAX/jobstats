@@ -1,9 +1,7 @@
 #!/usr/bin/perl
 
-# TODO: work by accepting finishedjobinfo output from stdin
-# TODO: integrate stdin into main discovery loop
-# DONE: no header by default, invert meaning of -d
-# TODO: add -q option for no table output
+# TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
+# TODO: is there another, deeper, location for jobstats files we can check?
 
 use strict;
 use warnings;
@@ -14,7 +12,7 @@ use Cwd 'abs_path';
 
 my $CWD = dirname(abs_path($0));
 
-my $version = "2014-03-24";
+my $version = "2014-04-01";
 
 my $cluster = "milou";   # -M
 my $do_plot = 0;         # -P
