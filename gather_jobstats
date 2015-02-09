@@ -148,8 +148,6 @@ sub getJobstatsFileCoreCount($);
 sub reorderNodeList($$);
 sub runPlotJobstats(@);
 
-@nodes = parseNodes($nodes) if $nodes;
-
 # parse a single finishedjobinfo-formatted line and return a hash
 sub parseFinishedjobinfoLine($) {
     my $line = shift;
@@ -256,6 +254,8 @@ sub print_JobRun(@) {
     }
     print STDOUT join("\t", @fields), "\n" if ! $quiet;
 }
+
+@nodes = parseNodes($nodes) if $nodes;
 
 while ( 1 ) {
 
