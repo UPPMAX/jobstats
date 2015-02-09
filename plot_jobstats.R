@@ -36,12 +36,16 @@ node.types = list(milou= c(mem128GB=128, mem256GB=256, mem512GB=512), milou.defa
                   tintin=c(mem64GB=64, mem128GB=128),                 tintin.default="mem64GB")
 
 main.line = 5
-main.cex = 1.8
+main.cex = 1.7
 main.sep = "  "
+user.line = 1.5
+user.cex = 1.4
+user.adj = 0.02
+axis.cex = 1.2
 flags.line = 1
 flags.sep = ",  "
 flags.line.sep = ",\n"
-flags.wrap = 3
+flags.wrap = 2
 flags.col = "red3"
 flags.cex = 1.2
 flag_mem_underused.fraction = 0.25
@@ -52,11 +56,10 @@ flag_node_severely_underused.fraction = 0.25
 # process command-line args, this is *very hacky*, args are order-dependent
 processArgs = function(args) {
   job = list()
-  while ( 1 ) {
-      switch(args[1],
-          "-n" =, "--no-plot" = { do.plot <<- FALSE;                     args = args[-1] },
-          "-v" =, "--verbose" = { do.verbose <<- TRUE; flags.wrap <<- 2; args = args[-1] },
-          "-m" =, "--memory"  = { do.memory <<- TRUE;                    args = args[-1] },
+  while ( 1 ) { switch(args[1],
+          "-n" =, "--no-plot" = { do.plot <<- FALSE;   args = args[-1] },
+          "-v" =, "--verbose" = { do.verbose <<- TRUE; args = args[-1] },
+          "-m" =, "--memory"  = { do.memory <<- TRUE;  args = args[-1] },
           break)
   }
   if (args[1] == "-f" || args[1] == "--full") {
@@ -64,15 +67,18 @@ processArgs = function(args) {
     job$data_type = "full"
     args = args[-1]
     # jobid cluster endtime runtime flags coresbooked core_list node_list jobstats_file_list
-    job$jobid = as.integer(args[1])
-    job$cluster = as.character(args[2])
-    job$endtime = as.character(args[3])
-    job$runtime = as.character(args[4])
-    job$flag_list = if (args[5] == ".") character(0) else unlist(strsplit(args[5], ",", fixed=TRUE))
-    job$booked = if (args[6] == ".") NA else as.integer(args[6])
-    job$core_list = as.integer(unlist(strsplit(args[7], ",", fixed=TRUE)))
-    job$node_list = unlist(strsplit(args[8], ",", fixed=TRUE))
-    job$file_list = unlist(strsplit(args[9], ",", fixed=TRUE))
+    job$jobid     = as.integer(args[1])
+    job$cluster   = as.character(args[2])
+    job$jobstate  = as.character(args[3])
+    job$user      = as.character(args[4])
+    job$project   = as.character(args[5])
+    job$endtime   = as.character(args[6])
+    job$runtime   = as.character(args[7])
+    job$flag_list = if (args[8] == ".") character(0) else unlist(strsplit(args[8], ",", fixed=TRUE))
+    job$booked    = if (args[9] == ".") NA else as.integer(args[9])
+    job$core_list = as.integer(unlist(strsplit(args[10], ",", fixed=TRUE)))
+    job$node_list = unlist(strsplit(args[11], ",", fixed=TRUE))
+    job$file_list = unlist(strsplit(args[12], ",", fixed=TRUE))
   } else {
     # arguments are a list of jobstats files
     job$data_type = "file"
@@ -122,14 +128,14 @@ examineUsage = function(dat) {
   core.mem.used = round(max.cores.busy * core.GB, 1)
 
   if (! cluster %in% names(node.types)) {
-    write(paste0("'", cluster, "' cluster node types not found, cannot check for node_type_misbooked"), 
+    write(paste0(cluster, " cluster node types not found, cannot check for node_type_misbooked"), 
           stderr())
   } else {
     nt = node.types[[cluster]]
     node.type.booked = names(nt)[which(max.GB.avail <= nt)[1]]
     node.type.needed = names(nt)[which(max.GB.used <= nt)[1]]
     if (! length(node.type.booked) || ! length(node.type.needed)) {
-      write(paste0("'", cluster, "' cluster missing a node type, cannot check for node_type_misbooked"), 
+      write(paste0(cluster, " cluster missing a node type, cannot check for node_type_misbooked"), 
             stderr())
     } else {
       if (node.type.booked != node.type.needed) {
@@ -193,8 +199,8 @@ plotJobstats = function(job, do.png=TRUE) {
   n.rows = if (n.panels > 1) as.integer(n.panels / 2 + 0.5) else 1
   if (.debug) cat("n.columns =", n.columns, " n.rows =", n.rows, "\n")
   width = 800
-  top.height = 150
-  panel.height = switch (n.panels, "1"=500, "2"=250, n.rows * 250)
+  top.height = 200
+  panel.height = switch (as.character(n.panels), "1"=500, "2"=250, n.rows * 250)
   height = top.height + panel.height
   if (.debug) cat("width =", width, " height =", height, "\n")
 
@@ -217,16 +223,21 @@ plotJobstats = function(job, do.png=TRUE) {
     }
   }
 
-  # Header lines: top line: cluster jobid endtime runtime
-  txt = paste(job$jobid, "on", paste0("'", job$cluster, "'"))
+  # Header lines: top line: jobid jobstate cluster endtime runtime
+  txt = paste(job$jobid, job$jobstate, "on", job$cluster)
   if (! is.null(job$endtime) && job$endtime != ".") 
     txt = paste(sep=main.sep, txt, paste("end:", job$endtime))
   if (! is.null(job$runtime) && job$runtime != ".") 
     txt = paste(sep=main.sep, txt, paste("runtime:", job$runtime))
   mtext(txt, font=2, cex=main.cex, line=main.line, side=3, outer=TRUE)
 
-  # Second line: flags in red
-  flags.header = if (n.panels > 1) paste("Flags (based on node", job$node_list[1], "only):") else "Flags:"
+  # User and project lines
+  txt = paste0("User: ", job$user, "\n", "Proj: ", job$project)
+  mtext(txt, font=2, cex=user.cex, line=user.line, side=3, adj=user.adj, outer=TRUE)
+
+  # Flags in red
+  flags.header = if (n.panels > 1) paste("Flags (based on node", job$node_list[1], "only):\n") else "Flags:"
+  if (n.panels > 1) flags.line = -1
   flags.list = character(0)
   if (length(job$flag_list) == 0) {
     flags.list = "none"
@@ -284,7 +295,7 @@ plotJobstatsPanel = function(dat, node="unknown") {
     dat$x[1] = 0  # reset left x
     dat$x[2] = sampling.window  # reset right x
   }
-  par(mar=c(4,4,2,5.5), las=1, mgp=c(2.0, 0.5, 0), tcl=-0.4)
+  par(mar=c(4,4,3,5.5), las=1, mgp=c(2.6, 0.5, 0), tcl=-0.4)
   #
   with(dat, plot(x, GB_USED, xlim=range.x, ylim=range.GB, 
                  col=col.GB, type="l", lwd=2, lty=lty.GB, 
@@ -292,12 +303,13 @@ plotJobstatsPanel = function(dat, node="unknown") {
                  main=node, 
                  xlab=paste0("Wall minutes since job start (5 min resolution, max ", 
                              range.x[2], " min)"),
-                 ylab=paste0("GB used (max ",range.GB[2]," GB)")))
+                 ylab=paste0("GB used (max ",range.GB[2]," GB)"),
+                 cex.axis=axis.cex, cex.lab=axis.cex))
   with(dat, lines(x, core_, col=col.core, lwd=2, lty=lty.core))
   #
-  axis(4, at=core.at, labels=core.labels, col.axis=col.core)
+  axis(4, at=core.at, labels=core.labels, col.axis=col.core, cex.axis=axis.cex)
   mtext(paste0("Core busy for ", num.cores, " cores (max ", num.cores * 100,"%)"), 
-        side=4, line=3.5, las=0, col=col.core) 
+        side=4, line=3.8, las=0, col=col.core, cex=axis.cex) 
   with(dat, points(x, swap_, pch=16, col="red"))
   if (any(! is.na(dat$swap_)))
     legend("topleft", legend="Swap\nused", bty="n", pch=pch.swap, col=col.swap, 

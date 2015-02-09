@@ -283,9 +283,9 @@ sub runPlotJobstats(@) {
     my @args = @_;
     -f "$plot_jobstats_R" or die "\n*** plot_jobstats.R script '$plot_jobstats_R' not available";
     unshift @args, "--full";   # must be just before @_
-    unshift @args, "--memory" if $memory;  # must be before --full
-    unshift @args, "--verbose" if $verbose;  # must be before --memory
-    unshift @args, "--no-plot" if ! $do_plot;  # must be first arg
+    unshift @args, "--memory" if $memory;
+    unshift @args, "--verbose" if $verbose;
+    unshift @args, "--no-plot" if ! $do_plot;
     my $flags = qx($plot_jobstats_R @args);
     chomp $flags;
     return($flags);
@@ -293,11 +293,11 @@ sub runPlotJobstats(@) {
 
 sub print_JobNotRun($) {
     my $ji = shift;
-    my @fields = ($ji->{jobid}, $cluster, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");;
+    my @fields = ($ji->{jobid}, $cluster, $ji->{jobstate}, $ji->{username}, $ji->{account}, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");;
     print_JobRun(@fields);
 }
 
-my $header = "jobid\tcluster\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
+my $header = "jobid\tcluster\tjobstate\tuser\tproject\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
 
 sub print_JobRun(@) {
     my @fields = @_;
@@ -324,6 +324,9 @@ while ( 1 ) {
     }
 
     # $cluster already declared above
+    my $jobstate = '.';
+    my $user = '.';
+    my $project = '.';
     my $endtime = '.';
     my $runtime = '.';
     my $booked = '.';
@@ -358,6 +361,9 @@ while ( 1 ) {
             next;
         }
         @node_list = parseNodes($ji->{nodes});
+        $jobstate = $ji->{jobstate};
+        $user = $ji->{username};
+        $project = $ji->{account}; 
         $endtime = $ji->{end_time};
         $runtime = $ji->{runtime};
         $booked = $ji->{procs};
@@ -389,18 +395,21 @@ while ( 1 ) {
     my @fields;
     push @fields, $jobid;  # 0
     push @fields, $cluster; # 1
-    push @fields, $endtime; # 2
-    push @fields, $runtime; # 3
-    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 4
-    push @fields, $booked; # 5
-    push @fields, (@core_list ? join(",", @core_list) : "."); # 6
-    push @fields, join(",", @node_list); # 7
-    push @fields, (@file_list ? join(",", @file_list) : "."); # 8
+    push @fields, $jobstate; # 2
+    push @fields, $user; # 3
+    push @fields, $project; # 4
+    push @fields, $endtime; # 5
+    push @fields, $runtime; # 6
+    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 7
+    push @fields, $booked; # 8
+    push @fields, (@core_list ? join(",", @core_list) : "."); # 9
+    push @fields, join(",", @node_list); # 10
+    push @fields, (@file_list ? join(",", @file_list) : "."); # 11
 
     # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
     if (@file_list) {
         my $pjs_flags = runPlotJobstats(@fields);
-        $fields[4] = $pjs_flags if $pjs_flags;
+        $fields[7] = $pjs_flags if $pjs_flags;
     }
 
     print_JobRun(@fields);
