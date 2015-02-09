@@ -4,10 +4,10 @@
 # DONE: (lka) verbose flag to be wordy about flag output?
 # DONE: (lka) get current cluster from $SNIC_RESOURCE
 # DONE: (lka) memory flag, perhaps only include if already a cores issue?
+# DONE: perhaps include more about user, jobstate in plot and table?
 # TODO: (lka) problem with plots from 100-node tintin job, and with 10-node tintin job
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
-# TODO: perhaps include more about user, jobstate in plot and table?
 
 my $version = "2015-02-09";
 
