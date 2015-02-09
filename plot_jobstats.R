@@ -49,7 +49,7 @@ flag_core_mem_underused.fraction = 0.5
 flag_node_half_underused.fraction = 0.5
 flag_node_severely_underused.fraction = 0.25
 
-# process command-line args
+# process command-line args, this is *very hacky*, args are order-dependent
 processArgs = function(args) {
   job = list()
   if (args[1] == "-n" || args[1] == "--no-plot") {
