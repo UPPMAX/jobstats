@@ -1,0 +1,337 @@
+milou-b: ~/github-sync/local/uppmax/jobstats $ finishedjobinfo -y -q -m b2012165 | grep emit | ./gather_jobstats - -M milou -d -p
+jobid	cluster	endtime	runtime	flag_list	booked	core_list	node_list	jobstats_list
+525646	milou	2014-01-10T01:43:28	03:34:59	.	1	.	m12	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 915.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 915.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 915.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 915.
+553552	milou	2014-01-10T16:31:34	00:00:00	.	0	.		.
+550002	milou	2014-01-12T06:28:38	1-00:00:11	.	4	.	m99	.
+553557	milou	2014-01-12T08:15:20	1-00:00:18	.	4	.	m155	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 918.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 918.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 918.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 918.
+553564	milou	2014-01-12T08:15:23	00:00:00	.	0	.		.
+564274	milou	2014-01-12T20:03:30	05:45:36	.	8	.	m37	.
+564275	milou	2014-01-12T20:03:30	05:45:36	.	8	.	m60	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 921.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 921.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 921.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 921.
+564276	milou	2014-01-12T20:03:47	00:00:00	.	0	.		.
+564405	milou	2014-01-13T12:34:57	00:01:50	.	16	.	m36	.
+564722	milou	2014-01-14T01:20:49	12:38:51	.	16	.	m27	.
+573941	milou	2014-01-14T22:20:31	00:11:51	.	16	.	m10	.
+574209	milou	2014-01-15T08:47:37	00:10:33	.	16	.	m16	.
+577042	milou	2014-01-17T12:57:04	1-18:56:19	.	16	.	m35	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 927.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 927.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 927.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 927.
+591733	milou	2014-01-17T16:27:57	00:00:00	.	0	.		.
+....
+720734	milou	2014-02-04T12:37:53	6-01:56:44	.	16	.	m138	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 982.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 982.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 982.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 982.
+849204	milou	2014-02-06T14:19:35	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 983.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 983.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 983.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 983.
+849205	milou	2014-02-06T14:19:38	00:00:00	.	0	.		.
+757289	milou	2014-02-06T19:56:41	23:20:26	.	16	.	m106	.
+849270	milou	2014-02-07T13:16:43	20:00:13	.	16	.	m153	.
+849271	milou	2014-02-07T13:21:35	20:00:08	.	16	.	m144	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 987.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 987.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 987.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 987.
+892559	milou	2014-02-07T14:28:57	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 988.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 988.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 988.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 988.
+892560	milou	2014-02-07T14:29:04	00:00:00	.	4	.		.
+....
+907285	milou	2014-02-11T11:42:01	00:21:00	.	16	.	m130	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1072.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1072.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1072.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1072.
+940039	milou	2014-02-12T15:28:48	00:00:00	.	0	.		.
+907462	milou	2014-02-12T23:15:51	1-11:33:27	.	16	.	m81	.
+907461	milou	2014-02-13T01:11:29	1-13:29:08	.	16	.	m98	.
+1083690	milou	2014-02-18T15:11:08	04:49:12	.	4	.	m86	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1076.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1076.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1076.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1076.
+1207667	milou	2014-03-06T11:56:02	00:00:00	.	4	.		.
+....
+1211360	milou	2014-03-07T11:42:30	16:27:33	.	16	.	m61	.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1099.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1099.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1099.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1099.
+1593536	milou	2014-04-16T17:59:08	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1100.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1100.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1100.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1100.
+1593537	milou	2014-04-16T17:59:13	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1101.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1101.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1101.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1101.
+1593538	milou	2014-04-16T17:59:19	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1102.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1102.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1102.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1102.
+1593546	milou	2014-04-16T18:17:05	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1103.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1103.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1103.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1103.
+1593547	milou	2014-04-16T18:17:11	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1104.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1104.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1104.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1104.
+1593548	milou	2014-04-16T18:17:22	00:00:00	.	0	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1105.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1105.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1105.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1105.
+1593559	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1106.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1106.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1106.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1106.
+1593543	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1107.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1107.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1107.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1107.
+1593554	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1108.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1108.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1108.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1108.
+1593552	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1109.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1109.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1109.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1109.
+1593555	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1110.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1110.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1110.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1110.
+1593558	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1111.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1111.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1111.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1111.
+1593569	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1112.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1112.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1112.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1112.
+1593545	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1113.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1113.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1113.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1113.
+1593544	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1114.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1114.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1114.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1114.
+1593553	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1115.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1115.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1115.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1115.
+1593551	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1116.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1116.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1116.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1116.
+1593568	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1117.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1117.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1117.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1117.
+1593562	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1118.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1118.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1118.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1118.
+1593577	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1119.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1119.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1119.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1119.
+1593576	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1120.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1120.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1120.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1120.
+1593550	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1121.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1121.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1121.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1121.
+1593575	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1122.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1122.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1122.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1122.
+1593578	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1123.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1123.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1123.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1123.
+1593561	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1124.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1124.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1124.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1124.
+1593556	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1125.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1125.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1125.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1125.
+1593584	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1126.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1126.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1126.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1126.
+1593582	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1127.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1127.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1127.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1127.
+1593571	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1128.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1128.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1128.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1128.
+1593570	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1129.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1129.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1129.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1129.
+1593587	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1130.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1130.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1130.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1130.
+1593560	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1131.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1131.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1131.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1131.
+1593589	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1132.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1132.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1132.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1132.
+1593590	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1133.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1133.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1133.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1133.
+1593592	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1134.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1134.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1134.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1134.
+1593585	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1135.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1135.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1135.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1135.
+1593583	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1136.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1136.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1136.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1136.
+1593591	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1137.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1137.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1137.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1137.
+1593574	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1138.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1138.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1138.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1138.
+1593597	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1139.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1139.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1139.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1139.
+1593593	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1140.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1140.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1140.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1140.
+1593595	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1141.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1141.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1141.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1141.
+1593599	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1142.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1142.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1142.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1142.
+1593594	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1143.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1143.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1143.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1143.
+1593572	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1144.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1144.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1144.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1144.
+1593596	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1145.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1145.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1145.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1145.
+1593549	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1146.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1146.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1146.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1146.
+1593586	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1147.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1147.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1147.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1147.
+1593588	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 178, <> line 1148.
+Use of uninitialized value $nodes in pattern match (m//) at ./gather_jobstats line 179, <> line 1148.
+Use of uninitialized value $node in concatenation (.) or string at ./gather_jobstats line 199, <> line 1148.
+Use of uninitialized value $_ in hash element at ./gather_jobstats line 228, <> line 1148.
+1593598	milou	2014-04-16T18:30:36	00:00:00	.	4	.		.
+1594001	milou	2014-04-17T00:47:20	03:22:38	mem_underused:126:10.6	16	16	m21	/sw/share/slurm/milou/uppmax_jobstats/m21/1594001
+1594002	milou	2014-04-17T01:18:42	03:51:08	mem_underused:126:6.6	16	16	m116	/sw/share/slurm/milou/uppmax_jobstats/m116/1594002
+1594041	milou	2014-04-17T04:38:48	06:07:17	mem_underused:126:10.5	16	16	m109	/sw/share/slurm/milou/uppmax_jobstats/m109/1594041
+1594000	milou	2014-04-17T04:46:26	07:21:51	mem_underused:126:8.8	16	16	m6	/sw/share/slurm/milou/uppmax_jobstats/m6/1594000
+1594039	milou	2014-04-17T04:47:52	06:29:08	mem_underused:126:11	16	16	m83	/sw/share/slurm/milou/uppmax_jobstats/m83/1594039
+1594037	milou	2014-04-17T05:04:11	07:31:35	mem_underused:126:11.2	16	16	m66	/sw/share/slurm/milou/uppmax_jobstats/m66/1594037
+1594038	milou	2014-04-17T05:10:02	07:08:45	mem_underused:126:11.1	16	16	m156	/sw/share/slurm/milou/uppmax_jobstats/m156/1594038
+1594040	milou	2014-04-17T05:48:40	07:17:24	mem_underused:126:11.1	16	16	m85	/sw/share/slurm/milou/uppmax_jobstats/m85/1594040
+1594036	milou	2014-04-17T06:33:28	08:03:27	mem_underused:126:11.4	16	16	m53	/sw/share/slurm/milou/uppmax_jobstats/m53/1594036
+1594035	milou	2014-04-17T07:18:41	08:52:18	mem_underused:126:11.1	16	16	m90	/sw/share/slurm/milou/uppmax_jobstats/m90/1594035
+1593999	milou	2014-04-17T10:43:14	13:20:51	mem_underused:126:5.5	16	16	m99	/sw/share/slurm/milou/uppmax_jobstats/m99/1593999
+1594032	milou	2014-04-17T10:55:57	12:37:38	mem_underused:126:11.3	16	16	m76	/sw/share/slurm/milou/uppmax_jobstats/m76/1594032
+

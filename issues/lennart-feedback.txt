@@ -1,0 +1,121 @@
+Hej Lennart,
+
+Thank you for the thorough going-over.  All those cases should be handled more cleanly.
+
+I should be more clear about the flag semantics, and I really like your suggestion of a verbose option for that.
+
+Some flags' content is informational, so the simple appearance of a core_underused or a mem_underused flag isn't meant to be a "red flag".
+
+cores_underused is determined by cores_used, which is max(booked cores with >0% usage at any single timepoint).  This is triggered if cores_used < cores_booked.
+
+mem_underused is triggered by fractional usage of GB_AVAIL, which is sensitive to number of booked cores, yes?  It is produced if GB_USED never goes over 25% of GB_AVAIL.
+
+These two flags are purely informational.  Given your comments, I think I will only output them with a verbose option.  The following flags, on the other hand, are intended to be truly indicative of underutilisation or other job problems.
+
+The core_mem_underused flag is triggered by >1 core booked, cores_underused==TRUE, and max(GB_USED) < (the number of cores used * mem per core).  The idea here is that more cores were booked than needed, with the extra memory from the unused cores also going unused.
+
+The node_half_underused flag is triggered by core_mem_underused==TRUE and cores_used <= 0.5 * cores_booked.
+
+The node_severely_underused flag is triggered by core_mem_underused==TRUE and cores_used <= 0.25 * cores_booked.
+
+nodes_overbooked and cores_overbooked are triggered when the number of used nodes (nodes with jobstats files) is less than the number of booked nodes (determined via finishedjobinfo).  The cores_overbooked is probably redundant here, because once you book >1 node you can only book whole nodes, yes?  I will drop it.  These are the only two flags which look at >1 node.  The other flags are determined by examination of the first booked node only.
+
+I will also add a swap_used flag.  Swap usage is indicated for relevant sampling points on the plot, but it is not included in the list of flags.
+
+I will make all this more explicit in the help and output.  With verbose output, for jobs which underutilised resources I will suggest alternative SLURM options that reflect the apparent scale of the job.
+
+Best,
+
+Doug
+-- 
+Douglas G. Scofield
+Evolutionary Biology Centre
+Uppsala University
+douglas.scofield@ebc.uu.se
+douglasgscofield@gmail.com
+
+
+Quoting Lennart Karlsson <Lennart.Karlsson@it.uu.se>:
+
+[Hide Quoted Text]
+On 04/01/2014 11:17 AM, Douglas G. Scofield wrote:
+Hej hej,
+
+I've updated gather_jobstats to accept finishedjobinfo output on its stdin (with - or --stdin) so one can do things like
+
+    finishedjobinfo -m -M milou my-project | grep 'jobstate=COMPLETED' | gather_jobstats - -p -q -M milou
+
+to produce plots for all completed jobs in my-project this month, or
+
+    finishedjobinfo -M milou my-project | gather_jobstats - -M milou | cut -f5
+
+to get a list of resource underutilisation flags for all available jobs.
+
+The complete help output is below.  Please let me know of any bugs or suggestions for modifications and improvements.
+
+Hej Doug,
+
+This is promising!
+
+Small bug: I tried command
+finishedjobinfo -m lka|/proj/b2013023/projects/douglas/public/gather_jobstats -
+and got error lines from Perl for my pre-run-cancelled jobs, like:
+Use of uninitialized value $nodes in pattern match (m//) at /proj/b2013023/projects/douglas/public/gather_jobstats line 178, <> line 1.
+Use of uninitialized value $nodes in pattern match (m//) at /proj/b2013023/projects/douglas/public/gather_jobstats line 179, <> line 1.
+Use of uninitialized value $node in concatenation (.) or string at /proj/b2013023/projects/douglas/public/gather_jobstats line 199, <> line 1.
+Use of uninitialized value $_ in hash element at /proj/b2013023/projects/douglas/public/gather_jobstats line 228, <> line 1.
+
+Probably such jobs can be quickly dismissed as never have started, or something like that.
+
+Removing the cancelled jobs from the finishedjobinfo output, got
+me around the problem:
+finishedjobinfo -m lka|grep -v jobstate=CANCELLED|/proj/b2013023/projects/douglas/public/gather_jobstats -
+
+I had mostly been running Elias's benchmark and got the following remarks:
+cores_underused:16:6,mem_underused:126:15.5,core_mem_underused:47.2:15.5,node_half_underused
+
+"cores_underused" is true, but this time it is not user's or programmer's fault,
+but a bug in the Linux kernel. So, it would be bad timing to introduce it to Milou users,
+before this Linux kernel bug is fixed (Tintin is not affected). Ah, now it might
+already have been fixed, say my fellow system experts!
+
+Some help would probably be needed to be sure that the 16:6, 126:15.5, and
+47.2:15.5 is understood correctly. I am happy to find that the "-h" flag to
+command gather_jobstats gives a lot of information, but for these numbers
+it explains only that they are flags. Please either add some explanation
+of what these numbers stands for, or, more daring, add a verbose flag to
+your command, that in detail explain the complaints given about the job.
+
+
+Running
+finishedjobinfo -m lka|grep -v jobstate=CANCELLED|/proj/b2013023/projects/douglas/public/gather_jobstats - -M tintin
+on Tintin, I get only a mem_underused:62.9:0.4 complaint, as expected, because all
+cores are used.
+
+General comment: It is very difficult to neither underuse cores nor memory, because
+of our way to allocate memory in proportion to the number of cores allocated. (Not
+doing that gives other problems of underutilization.) We should probably be happy
+if only one of the factors is underutilized.
+
+You have chosen Milou as the default system. In e.g. script finishedjobinfo, the default
+is "where you are running the command". There are at least two ways to see "where you
+are running the command". One is the SNIC_RESOURCE environment variable, and the other
+is to run "scontrol show conf" and from the output fetch system name from the
+"clustername" configuration line.
+
+So, trying the "-p" flag for first time, I continued on Tintin and tried the 100-node
+job with command
+/proj/b2013023/projects/douglas/public/gather_jobstats -M tintin -p 2279394
+which produced some kind of internal error:
+Error in png(paste0(job$cluster, "-", job$jobid, ".png"), width = width,  :
+  invalid 'height' argument
+Calls: plotJobstats -> png
+Execution halted
+
+I got the same problem with my ten-node job 2279392.
+
+The one-node job 2279393 got a graph, as expected. I like that the flag is shown
+there, so I can look for the mentioned levels among the curves.
+
+-- lka
+
