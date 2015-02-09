@@ -22,7 +22,7 @@ use Cwd 'abs_path';
 my $CWD = dirname(abs_path($0));
 my $NAME = basename($0);
 
-my $cluster = $ENV{'SNIC_RESOURCE'};  # -M
+my $cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
 my $do_plot = 0;         # -P
 my $memory = 0;          # -m
 my $nodes;               # -n
@@ -47,7 +47,7 @@ booked node showing CPU and memory usage, and include lines indicating the
 usage flags.  Plots are saved to the current directory with the name
 'cluster-jobid.png'.
 
-Cluster defaults to the value of \$SNIC_RESOURCE ('$ENV{SNIC_RESOURCE}' on the current system)
+Cluster defaults to the value of \$SNIC_RESOURCE ('$cluster' on the current system)
 if not specified.  There are three distinct modes for discovery about jobs of
 interest.
 
