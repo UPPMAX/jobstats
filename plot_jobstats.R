@@ -20,6 +20,10 @@ col.swap = "red";  pch.swap = 16 # if swap was used
 
 do.flags = TRUE # print list of flags to stdout
 
+do.memory = FALSE # include flags for memory-caution-only jobs
+
+do.verbose = FALSE # produce verbose instead of terse flags
+
 .debug = FALSE
 sampling.plot.offset = 2.5
 sampling.window = 5
@@ -34,13 +38,14 @@ node.types = list(milou= c(mem128GB=128, mem256GB=256, mem512GB=512), milou.defa
 main.line = 5
 main.cex = 1.8
 main.sep = "  "
-flags.line = 2
-flags.sep = "   "
-flags.line.sep = "\n"
+flags.line = 1
+flags.sep = ",  "
+flags.line.sep = ",\n"
 flags.wrap = 3
 flags.col = "red3"
 flags.cex = 1.2
 flag_mem_underused.fraction = 0.25
+flag_core_mem_underused.fraction = 0.5
 flag_node_half_underused.fraction = 0.5
 flag_node_severely_underused.fraction = 0.25
 
@@ -49,6 +54,15 @@ processArgs = function(args) {
   job = list()
   if (args[1] == "-n" || args[1] == "--no-plot") {
     do.plot <<- FALSE
+    args = args[-1]
+  }
+  if (args[1] == "-v" || args[1] == "--verbose") {
+    do.verbose <<- TRUE
+    flags.wrap <<- 2
+    args = args[-1]
+  }
+  if (args[1] == "-m" || args[1] == "--memory") {
+    do.memory <<- TRUE
     args = args[-1]
   }
   if (args[1] == "-f" || args[1] == "--full") {
@@ -130,26 +144,46 @@ examineUsage = function(dat) {
     }
   }
   flag_cores_underused = (num.cores > max.cores.busy)
-  flag_mem_underused = num.cores > 1 && max.GB.used < (max.GB.avail * flag_mem_underused.fraction)
-  flag_core_mem_underused = num.cores > 1 && (flag_cores_underused && (max.GB.used < core.mem.used))
+  flag_mem_underused = num.cores > 1 && 
+                       max.GB.used < (max.GB.avail * flag_mem_underused.fraction)
+  flag_core_mem_underused = num.cores > 1 && (flag_cores_underused && 
+                            (max.GB.used < (core.mem.used * flag_core_mem_underused.fraction)))
   flag_node_half_underused = (flag_core_mem_underused && 
                               max.cores.busy <= (num.cores * flag_node_half_underused.fraction))
   flag_node_severely_underused = (flag_core_mem_underused && 
                                   max.cores.busy <= (num.cores * flag_node_severely_underused.fraction))
 
+  include_memory_flag = do.memory || any(flag_cores_underused, flag_node_half_underused, flag_node_severely_underused)
   flag_list = character(0)
   if (flag_cores_underused)
-    flag_list = c(flag_list, paste0("cores_underused:", num.cores, ":", max.cores.busy))
-  if (flag_mem_underused)
-    flag_list = c(flag_list, paste0("mem_underused:", max.GB.avail, ":", max.GB.used))
-  if (flag_core_mem_underused)
-    flag_list = c(flag_list, paste0("core_mem_underused:", core.mem.used, ":", max.GB.used))
+    if (do.verbose) {
+      flag = paste0(num.cores, " cores booked but ", max.cores.busy, " used")
+      flag_list = c(flag_list, flag)
+    } else flag_list = c(flag_list, paste0("cores_underused:", num.cores, ":", max.cores.busy))
+  if (flag_mem_underused && include_memory_flag)
+    if (do.verbose) {
+      flag = paste0(max.GB.avail, " GB RAM available in booked cores but ", max.GB.used, " used")
+      flag_list = c(flag_list, flag)
+    } else flag_list = c(flag_list, paste0("mem_underused:", max.GB.avail, ":", max.GB.used))
+  if (flag_core_mem_underused && include_memory_flag)
+    if (do.verbose) {
+      flag = paste0(core.mem.used, " GB RAM available in used cores but ", max.GB.used, " used")
+      flag_list = c(flag_list, flag)
+    } else flag_list = c(flag_list, paste0("core_mem_underused:", core.mem.used, ":", max.GB.used))
   if (flag_node_half_underused)
-    flag_list = c(flag_list, "node_half_underused")
+    if (do.verbose) {
+      flag_list = c(flag_list, "Less than half the cores and RAM of the node were used")
+    } else flag_list = c(flag_list, "node_half_underused")
   if (flag_node_severely_underused)
-    flag_list = c(flag_list, "node_severely_underused")
+    if (do.verbose) {
+      flag_list = c(flag_list, "Less than one-quarter the cores and RAM of the node were used")
+      flag_list = c(flag_list, flag)
+    } else flag_list = c(flag_list, "node_severely_underused")
   if (flag_node_type_misbooked)
-    flag_list = c(flag_list, paste0("node_type_misbooked:", node.type.booked, ":", node.type.needed))
+    if (do.verbose) {
+      flag = paste0(node.type.booked, " node was booked but resources of a ", node.type.needed, " node were used")
+      flag_list = c(flag_list, flag)
+    } else flag_list = c(flag_list, paste0("node_type_misbooked:", node.type.booked, ":", node.type.needed))
   return(flag_list)
 }
 
