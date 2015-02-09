@@ -1,10 +1,10 @@
-#!/usr/bin/Rscript
+#!/usr/bin/env Rscript
 
-#  !/usr/bin/env Rscript
+# #!/usr/bin/Rscript
 
 # see processArgs() for command-line argument structure
 
-.version = "2014-04-01"
+.version = "2015-02-09"
 
 # TODO: decide what to do about multiple-node jobs with respect to examineUsage()
 # TODO: implement Getopt::Long or some sort of argument processing
