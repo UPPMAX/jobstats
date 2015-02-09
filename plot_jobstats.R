@@ -52,18 +52,12 @@ flag_node_severely_underused.fraction = 0.25
 # process command-line args, this is *very hacky*, args are order-dependent
 processArgs = function(args) {
   job = list()
-  if (args[1] == "-n" || args[1] == "--no-plot") {
-    do.plot <<- FALSE
-    args = args[-1]
-  }
-  if (args[1] == "-v" || args[1] == "--verbose") {
-    do.verbose <<- TRUE
-    flags.wrap <<- 2
-    args = args[-1]
-  }
-  if (args[1] == "-m" || args[1] == "--memory") {
-    do.memory <<- TRUE
-    args = args[-1]
+  while ( 1 ) {
+      switch(args[1],
+          "-n" =, "--no-plot" = { do.plot <<- FALSE;                     args = args[-1] },
+          "-v" =, "--verbose" = { do.verbose <<- TRUE; flags.wrap <<- 2; args = args[-1] },
+          "-m" =, "--memory"  = { do.memory <<- TRUE;                    args = args[-1] },
+          break)
   }
   if (args[1] == "-f" || args[1] == "--full") {
     # a full column-wise set of args as produced by the jobstats Perl script
