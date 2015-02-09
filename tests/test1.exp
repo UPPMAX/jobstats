@@ -1,0 +1,11 @@
+jobid	cluster	endtime	runtime	flag_list	booked	core_list	node_list	jobstats_list
+4428574	milou	.	00:00:00	not_run	1	.	.	.
+4418055	milou	.	00:00:00	not_run	1	.	.	.
+4444444	milou	2015-01-29T10:32:36	00:00:31	.	16	.	m130	.
+4444450	milou	2015-01-29T10:40:49	00:00:00	.	16	.	m149	.
+4440805	milou	2015-01-29T11:08:04	01:10:33	mem_underused:504.7:1.2,node_type_misbooked:mem512GB:mem128GB	16	16	m127	/sw/share/slurm/milou/uppmax_jobstats/m127/4440805
+4436789	milou	2015-01-29T14:35:58	04:57:34	mem_underused:252.2:2.3,node_type_misbooked:mem256GB:mem128GB	16	16	m138	/sw/share/slurm/milou/uppmax_jobstats/m138/4436789
+4458689	milou	.	00:00:00	not_run	0	.	.	.
+4444503	milou	2015-01-29T15:08:52	03:59:03	mem_underused:252.2:2.3,node_type_misbooked:mem256GB:mem128GB	16	16	m149	/sw/share/slurm/milou/uppmax_jobstats/m149/4444503
+4458779	milou	.	00:00:00	not_run	1	.	.	.
+4458874	milou	2015-01-29T17:47:44	00:43:41	mem_underused:504.7:1.2,node_type_misbooked:mem512GB:mem128GB	16	16	m133	/sw/share/slurm/milou/uppmax_jobstats/m133/4458874

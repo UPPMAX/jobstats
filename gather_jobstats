@@ -1,9 +1,9 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
-my $version = "2014-04-02";
+my $version = "2015-02-09";
 
 use strict;
 use warnings;
@@ -156,6 +156,7 @@ sub parseFinishedjobinfoLine($) {
     chomp $line;
     my (undef, undef, $keyvals) = split (/ /, $line, 3);
     return(0) if (! defined($keyvals));
+    # note that null values "... nodes= ..." will result in no key in the hash
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
     return(\%h);
 }
@@ -239,7 +240,22 @@ sub runPlotJobstats(@) {
     return($flags);
 }
 
+sub print_JobNotRun($) {
+    my $ji = shift;
+    my @fields = ($ji->{jobid}, $cluster, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");;
+    print_JobRun(@fields);
+}
+
 my $header = "jobid\tcluster\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
+
+sub print_JobRun(@) {
+    my @fields = @_;
+    if ($print_header) {  # don't print the header until ready to create output
+        print STDOUT $header, "\n" if ! $quiet;
+        $print_header = 0;
+    }
+    print STDOUT join("\t", @fields), "\n" if ! $quiet;
+}
 
 while ( 1 ) {
 
@@ -284,6 +300,10 @@ while ( 1 ) {
                 next;
             }
         }
+        if (! defined($ji->{nodes})) {  # appears the job never started
+            print_JobNotRun($ji);
+            next;
+        }
         @node_list = parseNodes($ji->{nodes});
         $endtime = $ji->{end_time};
         $runtime = $ji->{runtime};
@@ -321,11 +341,7 @@ while ( 1 ) {
         $fields[4] = $pjs_flags if $pjs_flags;
     }
 
-    if ($print_header) {  # don't print the header until ready to create output
-        print STDOUT $header, "\n" if ! $quiet;
-        $print_header = 0;
-    }
-    print STDOUT join("\t", @fields), "\n" if ! $quiet;
+    print_JobRun(@fields);
 
 }
 
