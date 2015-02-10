@@ -7,7 +7,6 @@
 .version = "2015-02-10"
 
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
-# TODO: implement Getopt::Long or some sort of argument processing
 # TODO: set limits below using arguments
 # TODO: better documentation
 
