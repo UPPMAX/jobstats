@@ -4,9 +4,9 @@
 
 # see processArgs() for command-line argument structure
 
-.version = "2015-02-09"
+.version = "2015-02-10"
 
-# TODO: decide what to do about multiple-node jobs with respect to examineUsage()
+# TODO: decide what to do about multiple-node jobs with respect to produceFlags()
 # TODO: implement Getopt::Long or some sort of argument processing
 # TODO: set limits below using arguments
 # TODO: better documentation
@@ -29,11 +29,12 @@ sampling.plot.offset = 2.5
 sampling.window = 5
 
 # first column in jobstats file for core usage
-first.core.column = 6  
+first.core.column = 6
 # sizes of available nodes for determining misbooking, sorted in increasing mem size
-node.types = list(milou= c(mem128GB=128, mem256GB=256, mem512GB=512), milou.default="mem128GB",  
-                  kalkyl=c(mem24GB=24, mem48GB=48,  mem72GB=72),      kalkyl.default="mem24GB",
-                  tintin=c(mem64GB=64, mem128GB=128),                 tintin.default="mem64GB")
+node.types = list(
+  milou= c(mem128GB=128, mem256GB=256, mem512GB=512), milou.default="mem128GB",
+  kalkyl=c(mem24GB=24, mem48GB=48,  mem72GB=72),      kalkyl.default="mem24GB",
+  tintin=c(mem64GB=64, mem128GB=128),                 tintin.default="mem64GB")
 
 main.line = 5
 main.cex = 1.7
@@ -48,18 +49,21 @@ flags.line.sep = ",\n"
 flags.wrap = 2
 flags.col = "red3"
 flags.cex = 1.2
-flag_mem_underused.fraction = 0.25
-flag_core_mem_underused.fraction = 0.5
-flag_node_half_underused.fraction = 0.5
-flag_node_severely_underused.fraction = 0.25
+flag_overbooked.fraction = 0.80
+flag_half_overbooked.fraction = 0.5
+flag_severely_overbooked.fraction = 0.25
+flag_cores_overbooked.fraction = 0.8
+flag_mem_overbooked.fraction = 0.25
+flag_core_mem_overbooked.fraction = 0.5
 
 # process command-line args, this is *very hacky*, args are order-dependent
 processArgs = function(args) {
   job = list()
   while ( 1 ) { switch(args[1],
-          "-n" =, "--no-plot" = { do.plot <<- FALSE;   args = args[-1] },
-          "-v" =, "--verbose" = { do.verbose <<- TRUE; args = args[-1] },
-          "-m" =, "--memory"  = { do.memory <<- TRUE;  args = args[-1] },
+          "-n" =, "--no-plot" = { do.plot <<- FALSE;       args = args[-1] },
+          "-v" =, "--verbose" = { do.verbose <<- TRUE;     args = args[-1] },
+          "-m" =, "--memory"  = { do.memory <<- TRUE;      args = args[-1] },
+          "-c" =, "--cluster" = { job$cluster <- args[2];  args = args[-c(1, 2)] },
           break)
   }
   if (args[1] == "-f" || args[1] == "--full") {
@@ -68,21 +72,23 @@ processArgs = function(args) {
     args = args[-1]
     # jobid cluster endtime runtime flags coresbooked core_list node_list jobstats_file_list
     job$jobid     = as.integer(args[1])
-    job$cluster   = as.character(args[2])
+    job$cluster   = if (is.null(job$cluster)) as.character(args[2])
     job$jobstate  = as.character(args[3])
     job$user      = as.character(args[4])
     job$project   = as.character(args[5])
     job$endtime   = as.character(args[6])
     job$runtime   = as.character(args[7])
-    job$flag_list = if (args[8] == ".") character(0) else unlist(strsplit(args[8], ",", fixed=TRUE))
-    job$booked    = if (args[9] == ".") NA else as.integer(args[9])
+    job$flag_list = if (args[8] == ".") character(0)
+                    else unlist(strsplit(args[8], ",", fixed=TRUE))
+    job$booked    = if (args[9] == ".") NA
+                    else as.integer(args[9])
     job$core_list = as.integer(unlist(strsplit(args[10], ",", fixed=TRUE)))
     job$node_list = unlist(strsplit(args[11], ",", fixed=TRUE))
     job$file_list = unlist(strsplit(args[12], ",", fixed=TRUE))
   } else {
     # arguments are a list of jobstats files
     job$data_type = "file"
-    job$cluster = "unknown"
+    job$cluster = if (is.null(job$cluster)) "unknown"
     job$jobid = basename(args[1])
     job$file_list = args
     # dummy up a node list
@@ -105,18 +111,19 @@ readJobstatsFile = function(file, node="unknown") {
 
 # Look at jobstats data.frame (with attributes) to see if there are
 # usage patterns that should be flagged
-examineUsage = function(dat) {
+produceFlags = function(dat) {
 
   file = attr(dat, "file")
   node = attr(dat, "node")
   cluster = attr(dat, "cluster")
 
-  flag_cores_underused = FALSE  # some cores (apparently) never used
-  flag_mem_underused = FALSE   # max mem used < one quarter of mem available
-  flag_core_mem_underused = FALSE   # max mem used < one quarter of mem available
-  flag_node_half_underused = FALSE   # num cores < max and memory < num cores * core memory fraction
-  flag_node_severely_underused = FALSE  # half or less of node used
-  flag_node_type_misbooked = FALSE # if on a non-default node, its booking was unnecessary
+  flag_overbooked = FALSE  # some fraction of all booked resources unused
+  flag_half_overbooked = FALSE   # half of all booked resources used
+  flag_severely_overbooked = FALSE  # one-quarter of all booked resources used
+  flag_node_type_overbooked = FALSE # if on a non-default node, its booking was unnecessary
+  flag_cores_overbooked = FALSE  # some cores never used
+  flag_mem_overbooked = FALSE   # max mem used < booked
+  flag_core_mem_overbooked = FALSE   # max mem used < mem in used cores
 
   num.cores = ncol(dat) - first.core.column + 1
   core.columns = first.core.column:ncol(dat)
@@ -124,67 +131,110 @@ examineUsage = function(dat) {
   max.cores.busy = max(cores.busy)
   max.GB.avail = max(dat$GB_LIMIT)
   max.GB.used = max(dat$GB_USED)
+  swap.used = any(dat$GB_SWAP_USED > 0)
   core.GB = max.GB.avail / num.cores
   core.mem.used = round(max.cores.busy * core.GB, 1)
 
   if (! cluster %in% names(node.types)) {
-    write(paste0(cluster, " cluster node types not found, cannot check for node_type_misbooked"), 
+    write(paste0(cluster, " missing node types, no check for node_type_overbooked"),
           stderr())
   } else {
     nt = node.types[[cluster]]
     node.type.booked = names(nt)[which(max.GB.avail <= nt)[1]]
     node.type.needed = names(nt)[which(max.GB.used <= nt)[1]]
     if (! length(node.type.booked) || ! length(node.type.needed)) {
-      write(paste0(cluster, " cluster missing a node type, cannot check for node_type_misbooked"), 
+      write(paste0(cluster, " missing node type, no check for node_type_overbooked"),
             stderr())
     } else {
       if (node.type.booked != node.type.needed) {
-        flag_node_type_misbooked = TRUE
+        flag_node_type_overbooked = TRUE
       }
     }
   }
-  flag_cores_underused = (num.cores > max.cores.busy)
-  flag_mem_underused = num.cores > 1 && 
-                       max.GB.used < (max.GB.avail * flag_mem_underused.fraction)
-  flag_core_mem_underused = num.cores > 1 && (flag_cores_underused && 
-                            (max.GB.used < (core.mem.used * flag_core_mem_underused.fraction)))
-  flag_node_half_underused = (flag_core_mem_underused && 
-                              max.cores.busy <= (num.cores * flag_node_half_underused.fraction))
-  flag_node_severely_underused = (flag_core_mem_underused && 
-                                  max.cores.busy <= (num.cores * flag_node_severely_underused.fraction))
+  fraction.cores.used = max.cores.busy / num.cores
+  fraction.mem.used = max.GB.used / max.GB.avail
+  flag_cores_overbooked = fraction.cores.used < flag_cores_overbooked.fraction
+  flag_mem_overbooked = num.cores > 1 && fraction.mem.used < flag_mem_overbooked.fraction
+  flag_core_mem_overbooked = num.cores > 1 && flag_cores_overbooked &&
+                            max.GB.used < (core.mem.used * flag_core_mem_overbooked.fraction)
+  max.fraction.used = max(fraction.cores.used, fraction.mem.used)
+  flag_overbooked = max.fraction.used < flag_overbooked.fraction
+  flag_half_overbooked = max.fraction.used < flag_half_overbooked.fraction
+  flag_severely_overbooked = max.fraction.used < flag_severely_overbooked.fraction
+  flag_swap_used = swap.used
 
-  include_memory_flag = do.memory || any(flag_cores_underused, flag_node_half_underused, flag_node_severely_underused)
+  include_memory_flag = do.memory ||
+                        any(flag_cores_overbooked, flag_half_overbooked,
+                            flag_severely_overbooked)
+
   flag_list = character(0)
-  if (flag_cores_underused)
-    if (do.verbose) {
+
+  if (flag_overbooked) {
+    if (do.verbose)
+      flag = paste0("Just ", round(flag_overbooked.fraction * 100, 0), 
+                   "% of booked core and RAM resources were used")
+    else flag = paste0("overbooked:", round(max.fraction.used * 100, 0), "%")
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_half_overbooked) {
+    if (do.verbose)
+      flag = "!! Less than half the booked cores and RAM were used"
+    else flag = "!!half_overbooked"
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_severely_overbooked) {
+    if (do.verbose)
+      flag = "!! Less than one-quarter the booked cores and RAM were used"
+    else flag = "!!severely_overbooked"
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_swap_used) {
+    if (do.verbose)
+      flag = "!! Swap space was used"
+    else flag = "!!swap_used"
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_node_type_overbooked) {
+    if (do.verbose)
+      flag = paste0(node.type.booked, " node was booked but resources of a ",
+                    node.type.needed, " node were used")
+    else flag = paste0("node_type_overbooked:", node.type.booked, ":",
+                         node.type.needed)
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_cores_overbooked) {
+    if (do.verbose)
       flag = paste0(num.cores, " cores booked but ", max.cores.busy, " used")
-      flag_list = c(flag_list, flag)
-    } else flag_list = c(flag_list, paste0("cores_underused:", num.cores, ":", max.cores.busy))
-  if (flag_mem_underused && include_memory_flag)
-    if (do.verbose) {
-      flag = paste0(max.GB.avail, " GB RAM available in booked cores but ", max.GB.used, " used")
-      flag_list = c(flag_list, flag)
-    } else flag_list = c(flag_list, paste0("mem_underused:", max.GB.avail, ":", max.GB.used))
-  if (flag_core_mem_underused && include_memory_flag)
-    if (do.verbose) {
-      flag = paste0(core.mem.used, " GB RAM available in used cores but ", max.GB.used, " used")
-      flag_list = c(flag_list, flag)
-    } else flag_list = c(flag_list, paste0("core_mem_underused:", core.mem.used, ":", max.GB.used))
-  if (flag_node_half_underused)
-    if (do.verbose) {
-      flag_list = c(flag_list, "Less than half the cores and RAM of the node were used")
-    } else flag_list = c(flag_list, "node_half_underused")
-  if (flag_node_severely_underused)
-    if (do.verbose) {
-      flag_list = c(flag_list, "Less than one-quarter the cores and RAM of the node were used")
-      flag_list = c(flag_list, flag)
-    } else flag_list = c(flag_list, "node_severely_underused")
-  if (flag_node_type_misbooked)
-    if (do.verbose) {
-      flag = paste0(node.type.booked, " node was booked but resources of a ", node.type.needed, " node were used")
-      flag_list = c(flag_list, flag)
-    } else flag_list = c(flag_list, paste0("node_type_misbooked:", node.type.booked, ":", node.type.needed))
+    else flag = paste0("cores_overbooked:", num.cores, ":", max.cores.busy)
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_mem_overbooked && include_memory_flag) {
+    if (do.verbose)
+      flag = paste0(max.GB.avail, " GB RAM available in booked cores but ",
+                    max.GB.used, " used")
+    else flag = paste0("mem_overbooked:", max.GB.avail, ":", max.GB.used)
+    flag_list = c(flag_list, flag)
+  }
+
+  if (flag_core_mem_overbooked && include_memory_flag) {
+    if (do.verbose)
+      flag = paste0(core.mem.used, " GB RAM available in used cores but ",
+                    max.GB.used, " used")
+    else flag = paste0("core_mem_overbooked:", core.mem.used, ":", max.GB.used)
+    flag_list = c(flag_list, flag)
+  }
+
   return(flag_list)
+}
+
+plotFilename = function(job) {
+  paste0(paste(sep="-", job$cluster, job$jobid, job$project, job$user), ".png")
 }
 
 # Plot a full set of jobstats panels.  Could be just 1
@@ -206,7 +256,7 @@ plotJobstats = function(job, do.png=TRUE) {
 
 
   if (do.png)
-    png(paste0(job$cluster,"-",job$jobid,".png"), width=width, height=height)
+    png(plotFilename(job), width=width, height=height)
 
   opa = par(no.readonly=TRUE)
   par(mfrow=c(n.rows, n.columns), oma=c(0, 0, 7, 0))
@@ -225,9 +275,9 @@ plotJobstats = function(job, do.png=TRUE) {
 
   # Header lines: top line: jobid jobstate cluster endtime runtime
   txt = paste(job$jobid, job$jobstate, "on", job$cluster)
-  if (! is.null(job$endtime) && job$endtime != ".") 
+  if (! is.null(job$endtime) && job$endtime != ".")
     txt = paste(sep=main.sep, txt, paste("end:", job$endtime))
-  if (! is.null(job$runtime) && job$runtime != ".") 
+  if (! is.null(job$runtime) && job$runtime != ".")
     txt = paste(sep=main.sep, txt, paste("runtime:", job$runtime))
   mtext(txt, font=2, cex=main.cex, line=main.line, side=3, outer=TRUE)
 
@@ -249,14 +299,14 @@ plotJobstats = function(job, do.png=TRUE) {
     i = flags.wrap + 1
     while ((i + flags.wrap - 1) <= length(job$flag_list)) {
       j = i + flags.wrap - 1
-      flags.list = paste(sep=flags.line.sep, 
-                         flags.list, 
+      flags.list = paste(sep=flags.line.sep,
+                         flags.list,
                          paste(collapse=flags.sep, job$flag_list[i:j]))
       i = i + flags.wrap
     }
     if (i <= length(job$flag_list)) {
-      flags.list = paste(sep=flags.line.sep, 
-                        flags.list, 
+      flags.list = paste(sep=flags.line.sep,
+                        flags.list,
                         paste(collapse=flags.sep, job$flag_list[i:length(job$flag_list)]))
     }
   }
@@ -297,22 +347,22 @@ plotJobstatsPanel = function(dat, node="unknown") {
   }
   par(mar=c(4,4,3,5.5), las=1, mgp=c(2.6, 0.5, 0), tcl=-0.4)
   #
-  with(dat, plot(x, GB_USED, xlim=range.x, ylim=range.GB, 
-                 col=col.GB, type="l", lwd=2, lty=lty.GB, 
+  with(dat, plot(x, GB_USED, xlim=range.x, ylim=range.GB,
+                 col=col.GB, type="l", lwd=2, lty=lty.GB,
                  bty="U",
-                 main=node, 
-                 xlab=paste0("Wall minutes since job start (5 min resolution, max ", 
+                 main=node,
+                 xlab=paste0("Wall minutes since job start (5 min resolution, max ",
                              range.x[2], " min)"),
                  ylab=paste0("GB used (max ",range.GB[2]," GB)"),
                  cex.axis=axis.cex, cex.lab=axis.cex))
   with(dat, lines(x, core_, col=col.core, lwd=2, lty=lty.core))
   #
   axis(4, at=core.at, labels=core.labels, col.axis=col.core, cex.axis=axis.cex)
-  mtext(paste0("Core busy for ", num.cores, " cores (max ", num.cores * 100,"%)"), 
-        side=4, line=3.8, las=0, col=col.core, cex=axis.cex) 
+  mtext(paste0("Core busy for ", num.cores, " cores (max ", num.cores * 100,"%)"),
+        side=4, line=3.8, las=0, col=col.core, cex=axis.cex)
   with(dat, points(x, swap_, pch=16, col="red"))
   if (any(! is.na(dat$swap_)))
-    legend("topleft", legend="Swap\nused", bty="n", pch=pch.swap, col=col.swap, 
+    legend("topleft", legend="Swap\nused", bty="n", pch=pch.swap, col=col.swap,
            text.col=col.swap)
 
 }
@@ -321,9 +371,10 @@ gatherAllJobstats = function(job) {
   for (i in 1:length(job$file_list)) {
     node = job$node_list[i]
     job$data_list[[ node ]] = readJobstatsFile(job$file_list[i], node)
-    attr(job$data_list[[ node ]], "cluster")  = job$cluster
+    attr(job$data_list[[ node ]], "cluster") = job$cluster
   }
-  job$flag_list = c(job$flag_list, examineUsage(job$data_list[[1]]))
+  job$swap_used = any(unlist(lapply(job$data_list, function(x) any(x$GB_SWAP_USED > 0))))
+  job$flag_list = c(job$flag_list, produceFlags(job$data_list[[1]]))
   return(job)
 }
 
@@ -336,7 +387,7 @@ if (FALSE && .debug) { cat("after processArgs()\n"); print(job) }
 job = gatherAllJobstats(job)
 if (.debug) { cat("after gatherAllJobstats()\n"); print(job) }
 
-#  return list of flags 
+#  return list of flags
 if (do.flags) {
   write(paste(collapse=",", job$flag_list), stdout())
 }

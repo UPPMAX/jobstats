@@ -9,7 +9,7 @@
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
-my $version = "2015-02-09";
+my $version = "2015-02-10";
 
 use strict;
 use warnings;
@@ -45,10 +45,59 @@ Discover jobstats for the specified job(s) on the specified cluster.
 With the -p option, produce a plot for each jobid.  Plots contain one panel per
 booked node showing CPU and memory usage, and include lines indicating the
 usage flags.  Plots are saved to the current directory with the name
-'cluster-jobid.png'.
+'cluster-jobid-project-user.png'.
 
 Cluster defaults to the value of \$SNIC_RESOURCE ('$cluster' on the current system)
-if not specified.  There are three distinct modes for discovery about jobs of
+if not specified.
+
+COMMAND-LINE OPTIONS
+--------------------
+
+    -M cluster         Cluster on which the job was run [default here is '$cluster']
+    -n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
+                       the finishedjobinfo script is not run and discovery is
+                       restricted to only the specified nodes.  Nodes can be specified
+                       as a comma-separated list of complete node names, or using the
+                       finishedjobinfo syntax:
+                             m78,m90,m91,m92,m100  or  m[78,90-92,100]
+                       Nonsensical results will occur if the syntaxes are mixed.
+    - | --stdin        Accept input on stdin formatted like finishedjobinfo output.
+                       The short form of this option is a single dash '-'.
+
+    -m | --memory      Always include memory usage flags in output.  Default behaviour
+                       is to include memory usage flags only if CPU usage flags are
+                       also present.
+
+    -v | --verbose     Be wordy when describing flag values.
+
+    -p | --plot        Produce CPU and memory usage plot for each jobid
+
+    -q | --quiet       Do not produce table output
+
+    -d                 Produce a header for table output
+
+    -h | --help | -?   Produce detailed help information
+
+    jobid [jobid ...]  Job number valid on the cluster
+
+The following command-line options are generally only useful for Uppmax staff.
+
+    -x directory       Directory prefix to use for jobstats files.  Default is
+                       '$prefix', and directory structure is 
+
+                           <prefix>/<cluster>/uppmax_jobstats/<node>/<jobid>
+
+    -X directory       Hard directory prefix to use for jobstats files.  Jobstats
+                       files are assumed available directly: '<hard-prefix>/<jobid>'
+    -f file            finishedjobinfo script [default is '$finishedjobinfo']
+    -s file            plot_jobstats.R script [default is '$plot_jobstats_R']
+
+";
+
+my $detailed_usage = "DETAILED USAGE
+--------------
+
+There are three distinct modes for discovery about jobs of
 interest.
 
   1. finishedjobinfo is used to discover information about jobs
@@ -72,95 +121,87 @@ cancelled or ran for less than 5 minutes.  Also, if a job booked nodes
 inefficiently by not using nodes it asked for, jobstats files will not be
 available for the booked but unused nodes.
 
-Output for each job is a tab-separated line with the following fields:
+OUTPUT
+------
 
-  jobid cluster endtime runtime flags booked cores node[,node...] jobstats[,jobstats...] 
+This script produces two types of output.  If the '-p' command line option is
+provided, a plot is created of core and memory usage across the life
+of the job.  The name of the file produced has the format:
+
+    cluster-jobid-project-user.png
+
+Also output for each job (unless the '-q' option is provided) is a
+tab-separated line with the following fields:
+
+  jobid cluster jobstate user project endtime runtime flags booked cores node[,node...] jobstats[,jobstats...] 
 
 Field contents:
 
   jobid    : Job ID
   cluster  : Cluster on which the job was run
+  jobstate : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED
+  user     : Username that submitted the job
+  project  : Project account under which the job was run
   endtime  : End time of the job (with -n, this is '.')
   runtime  : Runtime of the job (with -n, this is '.')
-  flags    : Flags indicating various types of resource underutilizations.
+  flags    : Flags indicating various types of resource underutilizations
   booked   : Number of booked cores (with -n, this is '.')
   cores    : Number of cores represented in the discovered jobstats files.
   node     : Node(s) booked for the job, expanded into individual node names,
              separated by commas ','; if no nodes were found, this is '.'.  
              The nodes for which jobstats files are available are listed first.
-
   jobstats : jobstats files for the nodes, in the same order the nodes are 
              listed, separated by commas ','; if no jobstats files, this is '.'
 
-The 'flags' field is a comma-separated list of cautions regarding core and/or
-memory underutilisation.  Some flags have a threshold below which they appear.
-The default format is:
+FLAGS
+-----
 
-  flag:value-booked:value-used
+In both plot and table output, flags are a comma-separated list of cautions
+regarding core and/or memory underutilisation.  The appearance of a flag does
+not necessarily mean that resources were used incorrectly.  It depends upon the
+tools being used and the contents of the SLURM header, and also depends upon
+the job profile.  Because usage information is gathered every 5 minutes, higher
+transient usage of cores or memory may not be captured in the log files.
 
-Flags:
+Flags requiring particular attention are overbooked, !!half_overbooked,
+!!severely_overbooked, and !!swap_used.
 
-  cores_underused
-      More cores were booked than used.
-  mem_underused
-      More memory was available than was used (if < 25%).
-  core_mem_underused
-      Less memory was used than was available in the cores that were used (if < 50%).
-  node_half_underused
+For multinode jobs, flags are currently determined based only on the usage of the
+first node.  Multinode jobs require careful analysis so as to not waste resources
+unnecessarily, and it is a common mistake among beginning Uppmax users to book
+multiple nodes and run tools that cannot use more than the first.
+
+Some flags have a threshold below which they appear.  The default format is
+generally 'flag:value-booked:value-used'.
+
+  overbooked : % used (if < 80%)
+      The maximum percentage of booked cores and/or memory that was used
+  !!half_overbooked
       No more than 1/2 of both cores and memory of a node was used; consider booking 
       half a node instead.
-  node_severely_underused
+  !!severely_overbooked
       No more than 1/4 of both cores and memory of a node was used, examine your job
       requirements closely.
-  node_type_misbooked
+  !!swap_used
+      Swap storage was used at any point within the job run
+  node_type_overbooked : type booked : type used
       A fat node was requested that was larger than was needed.  This flag may be
-      produced spuriously of SLURM ran the job on a fat node when a fat node was not
-      requested.
+      produced spuriously if SLURM ran the job on a fat node when a fat node was not
+      requested by the user.
+  cores_overbooked : cores booked : cores used
+      More cores were booked than used (if < 80%)
+  mem_overbooked : GB booked : GB used
+      More memory was available than was used (if < 25% and more than one core).
+  core_mem_overbooked : GB in used cores : GB used
+      Less memory was used than was available in the cores that were used (if < 50%).
 
-By default no flags are indicated for jobs with memory-only cautions; use the
--m option to include these flags on such jobs.  More verbose flags are output
-with the -v option.
+By default no flags are indicated for jobs with memory-only cautions except for
+swap usage; use the -m option to include these flags on such jobs.  More
+verbose flags are output with the -v option.
 
-Options:
-
-    -M cluster         Cluster on which the job was run [default here is '$cluster']
-    -n node[,node...]  Cluster node(s) on which the job was run.  If specified, then
-                       the finishedjobinfo script is not run and discovery is
-                       restricted to only the specified nodes.  Nodes can be specified
-                       as a comma-separated list of complete node names, or using the
-                       finishedjobinfo syntax:
-                             m78,m90,m91,m92,m100  or  m[78,90-92,100]
-                       Nonsensical results will occur if the syntaxes are mixed.
-    - | --stdin        Accept input on stdin formatted like finishedjobinfo output.
-                       The short form of this option is a single dash '-'.
-
-    -m | --memory      Always include memory usage flags in output.  Default behaviour
-                       is to include memory usage flags only if CPU usage flags are also
-                       present.
-
-    -v | --verbose     Be wordy when describing flag values.
-
-    -p | --plot        Produce CPU and memory usage plot for each jobid
-
-    -d                 Produce a header for table output
-    -q                 Do not produce table output.  If -p is not specified, then the
-                       script produces no output but still continues with discovery.
-
-    -x directory       Directory prefix to use for jobstats files.  Default is
-                       '$prefix', and directory structure is 
-
-                           <prefix>/<cluster>/uppmax_jobstats/<node>/<jobid>
-
-    -X directory       Hard directory prefix to use for jobstats files.  Jobstats files
-                       are assumed available directly: '<hard-prefix>/<jobid>'
-    -f file            finishedjobinfo script [default is '$finishedjobinfo']
-    -s file            plot_jobstats.R script [default is '$plot_jobstats_R']
-    -h                 This help information
-
-    jobid [jobid ...]  Job number valid on the specified cluster
-
-Location: $0
+Script:   $0
 Version:  $version
+
 ";
 
 GetOptions("M=s"     => \$cluster, 
@@ -171,21 +212,21 @@ GetOptions("M=s"     => \$cluster,
            "verbose" => \$verbose,
            "plot"    => \$do_plot,
            "d"       => \$print_header,
-           "q"       => \$quiet,
+           "quiet"   => \$quiet,
            "x=s"     => \$prefix,
            "X=s"     => \$hard_prefix,
            "f=s"     => \$finishedjobinfo,
            "s=s"     => \$plot_jobstats_R,
-           "help"    => \$help) or die "$usage";
-die "$usage" if $help;
+           "help|?"  => \$help) or die "$usage";
+die "$usage$detailed_usage" if $help;
 
 @jobs = @ARGV;
 
-($cluster and ($stdin or scalar(@jobs) >= 1)) or die "\n*** At least one jobid is required.\n$usage";
+($cluster and ($stdin or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid is required.\n***\n$usage";
 
 my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" );
 
--d "$PREFIX" or die "\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n$usage";
+-d "$PREFIX" or die "\n***\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n***\n$usage";
 
 my $username = scalar getpwuid $<;
 my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
@@ -213,7 +254,7 @@ sub parseFinishedjobinfoLine($) {
 # discover jobinfo for a single job using finishedjobinfo script
 sub jobInfo($) {
     my $j = shift;
-    -f "$finishedjobinfo" or die "\n*** finishedjobinfo script '$finishedjobinfo' not available";
+    -f "$finishedjobinfo" or die "\n***\n*** finishedjobinfo script '$finishedjobinfo' not available\n***";
     return parseFinishedjobinfoLine(qx($finishedjobinfo -q -M $cluster -j $j));
 }
 
@@ -255,7 +296,7 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
 # look in jobstats file for number of cores used
 sub getJobstatsFileCoreCount($) {
     my $file = shift;
-    open(F, "<$file") or die "*** Could not open jobstats file $file: $!";
+    open(F, "<$file") or die "***\n*** Could not open jobstats file $file: $!\n***";
     scalar(<F>); # header line
     my $l = <F>; # first data line
     # first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
@@ -281,7 +322,7 @@ sub reorderNodeList($$) {
 
 sub runPlotJobstats(@) {
     my @args = @_;
-    -f "$plot_jobstats_R" or die "\n*** plot_jobstats.R script '$plot_jobstats_R' not available";
+    -f "$plot_jobstats_R" or die "\n***\n*** plot_jobstats.R script '$plot_jobstats_R' not available\n***";
     unshift @args, "--full";   # must be just before @_
     unshift @args, "--memory" if $memory;
     unshift @args, "--verbose" if $verbose;
@@ -343,16 +384,16 @@ while ( 1 ) {
         my $ji;
         if ($stdin) {
             $ji = parseFinishedjobinfoLine($input_line);
-            die "*** Jobid cannot be found, inconsistency in stdin input" if ! $ji;
+            die "***\n*** Jobid cannot be found, inconsistency in stdin input\n***" if ! $ji;
             $jobid = $ji->{jobid};
         } else {
             $ji = jobInfo($jobid);
             if (! $ji) {  # couldn't find jobinfo, give error and skip to next
-                print STDERR "*** Jobid $jobid cannot be found\n";
+                print STDERR "***\n*** Jobid $jobid cannot be found\n***\n";
                 next;
             }
             if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
-                print STDERR "*** Please, do not check other projects (jobid $jobid in $ji->{account})\n";
+                print STDERR "***\n*** Please, do not check other projects (jobid $jobid in $ji->{account})\n***\n";
                 next;
             }
         }
