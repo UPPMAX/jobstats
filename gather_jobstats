@@ -1,11 +1,11 @@
 #!/usr/bin/env perl
 
-# DONE: (lka) help information about flag:number:number values
-# DONE: (lka) verbose flag to be wordy about flag output?
-# DONE: (lka) get current cluster from $SNIC_RESOURCE
-# DONE: (lka) memory flag, perhaps only include if already a cores issue?
-# DONE: perhaps include more about user, jobstate in plot and table?
-# TODO: (lka) problem with plots from 100-node tintin job, and with 10-node tintin job
+# DONE: (from lka) help information about flag:number:number values
+# DONE: (from lka) verbose flag to be wordy about flag output?
+# DONE: (from lka) get current cluster from $SNIC_RESOURCE
+# DONE: (from lka) memory flag only included if already a cores issue
+# DONE: (from lka) problem with plots from 100-node tintin job, and with 10-node tintin job
+# DONE: include more about user, jobstate in plot and table
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
