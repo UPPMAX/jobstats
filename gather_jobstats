@@ -9,7 +9,7 @@
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
-my $version = "2015-02-10";
+my $version = "2015-02-11";
 
 use strict;
 use warnings;
@@ -23,6 +23,9 @@ my $CWD = dirname(abs_path($0));
 my $NAME = basename($0);
 
 my $cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
+my $source = "fji";  # -s/--source, "fji" for finishedjobinfo, "db" for Martin's database
+my %source_values = ( fji => "fji", finishedjobinfo => "fji", db => "db" );
+my %source_R_flags = ( fji => "--fji", db => "--db" );
 my $do_plot = 0;         # -P
 my $memory = 0;          # -m
 my $nodes;               # -n
@@ -34,7 +37,7 @@ my $print_header = 0;    # -d
 my $verbose = 0;         # -v
 my $quiet = 0;           # -q
 my $finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
-my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -s
+my $plot_jobstats_R = "$CWD/plot_jobstats.R"; # -r
 my $prefix = "/sw/share/slurm"; # -x
 my $hard_prefix = "";    # -X
 my $usage = "
@@ -68,6 +71,13 @@ COMMAND-LINE OPTIONS
                        is to include memory usage flags only if CPU usage flags are
                        also present.
 
+    -s | --source fji | db
+                       Source of the input data.  Default is '$source', the
+                       finishedjobinfo script. 'db' may be used to access a more
+                       rapid but less comprehensive database of job information.
+                       This may also be used with the - flag when sending job
+                       information via stdin.
+
     -v | --verbose     Be wordy when describing flag values.
 
     -p | --plot        Produce CPU and memory usage plot for each jobid
@@ -90,7 +100,7 @@ The following command-line options are generally only useful for Uppmax staff.
     -X directory       Hard directory prefix to use for jobstats files.  Jobstats
                        files are assumed available directly: '<hard-prefix>/<jobid>'
     -f file            finishedjobinfo script [default is '$finishedjobinfo']
-    -s file            plot_jobstats.R script [default is '$plot_jobstats_R']
+    -r file            plot_jobstats.R script [default is '$plot_jobstats_R']
 
 ";
 
@@ -163,17 +173,20 @@ tools being used and the contents of the SLURM header, and also depends upon
 the job profile.  Because usage information is gathered every 5 minutes, higher
 transient usage of cores or memory may not be captured in the log files.
 
-Flags requiring particular attention are overbooked, !!half_overbooked,
-!!severely_overbooked, and !!swap_used.
+Flags most likely to represent real overbooking of resources are nodes_overbooked,
+overbooked, !!half_overbooked, !!severely_overbooked, and !!swap_used.
 
-For multinode jobs, flags are currently determined based only on the usage of the
-first node.  Multinode jobs require careful analysis so as to not waste resources
-unnecessarily, and it is a common mistake among beginning Uppmax users to book
-multiple nodes and run tools that cannot use more than the first.
+For multinode jobs, flags other than nodes_overbooked are determined based only
+on the usage of the first node.  Multinode jobs require careful analysis so as
+to not waste resources unnecessarily, and it is a common mistake among
+beginning Uppmax users to book multiple nodes and run tools that cannot use
+more than the first.  In this case, nodes_overbooked will appear.
 
 Some flags have a threshold below which they appear.  The default format is
 generally 'flag:value-booked:value-used'.
 
+  nodes_overbooked : nodes booked : nodes used
+      More nodes were booked than used
   overbooked : % used (if < 80%)
       The maximum percentage of booked cores and/or memory that was used
   !!half_overbooked
@@ -208,6 +221,7 @@ GetOptions("M=s"     => \$cluster,
            "n=s"     => \$nodes,
            ""        => \$stdin,
            "stdin"   => \$stdin,
+           "source"  => \$source,
            "memory"  => \$memory,
            "verbose" => \$verbose,
            "plot"    => \$do_plot,
@@ -216,13 +230,15 @@ GetOptions("M=s"     => \$cluster,
            "x=s"     => \$prefix,
            "X=s"     => \$hard_prefix,
            "f=s"     => \$finishedjobinfo,
-           "s=s"     => \$plot_jobstats_R,
+           "r=s"     => \$plot_jobstats_R,
            "help|?"  => \$help) or die "$usage";
 die "$usage$detailed_usage" if $help;
 
 @jobs = @ARGV;
 
 ($cluster and ($stdin or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid is required.\n***\n$usage";
+
+$source = defined($source_values{$source}) ? $source_values{$source} : die "unrecognised --source value '$source'";
 
 my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" );
 
@@ -231,6 +247,10 @@ my $PREFIX = ( $hard_prefix ? $hard_prefix : "$prefix/$cluster/uppmax_jobstats" 
 my $username = scalar getpwuid $<;
 my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
 my $in_staff = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
+
+my $jobcount = 0;
+my $jobcount_notrun = 0;
+my $no_jobstats_file = 0;
 
 sub parseFinishedjobinfoLine($);
 sub jobInfo($);
@@ -323,7 +343,7 @@ sub reorderNodeList($$) {
 sub runPlotJobstats(@) {
     my @args = @_;
     -f "$plot_jobstats_R" or die "\n***\n*** plot_jobstats.R script '$plot_jobstats_R' not available\n***";
-    unshift @args, "--full";   # must be just before @_
+    unshift @args, $source_R_flags{$source};  # --fji or --db, must be just before @_
     unshift @args, "--memory" if $memory;
     unshift @args, "--verbose" if $verbose;
     unshift @args, "--no-plot" if ! $do_plot;
@@ -334,19 +354,28 @@ sub runPlotJobstats(@) {
 
 sub print_JobNotRun($) {
     my $ji = shift;
-    my @fields = ($ji->{jobid}, $cluster, $ji->{jobstate}, $ji->{username}, $ji->{account}, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");;
+    my @fields = ($ji->{jobid}, $cluster, $ji->{jobstate}, $ji->{username}, $ji->{account}, $ji->{jobname}, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");;
     print_JobRun(@fields);
 }
 
-my $header = "jobid\tcluster\tjobstate\tuser\tproject\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
+my $header = "jobid\tcluster\tjobstate\tuser\tproject\tjobname\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
 
 sub print_JobRun(@) {
     my @fields = @_;
-    if ($print_header) {  # don't print the header until ready to create output
-        print STDOUT $header, "\n" if ! $quiet;
+    if ($print_header and not $quiet) {  # don't print the header until ready to create output
+        print STDOUT $header, "\n";
         $print_header = 0;
     }
-    print STDOUT join("\t", @fields), "\n" if ! $quiet;
+    print STDOUT join("\t", @fields), "\n" if not $quiet;
+    if ($fields[$#fields] eq ".") {
+        ++$no_jobstats_file;
+        # don't produce this warning for now, just rely on end-of-job summary
+        if (0 and not $quiet) {
+            print STDERR "*** No jobstats files found for jobid $fields[0], minimal resource usage diagnosis";
+            print STDERR " and no plot can be produced" if $do_plot;
+            print STDERR "\n";
+        }
+    }
 }
 
 @nodes = parseNodes($nodes) if $nodes;
@@ -364,10 +393,13 @@ while ( 1 ) {
         $jobid = shift @jobs;
     }
 
+    ++$jobcount;
+
     # $cluster already declared above
     my $jobstate = '.';
     my $user = '.';
     my $project = '.';
+    my $jobname = '.';
     my $endtime = '.';
     my $runtime = '.';
     my $booked = '.';
@@ -398,6 +430,7 @@ while ( 1 ) {
             }
         }
         if (! defined($ji->{nodes})) {  # appears the job never started
+            ++$jobcount_notrun;
             print_JobNotRun($ji);
             next;
         }
@@ -405,6 +438,7 @@ while ( 1 ) {
         $jobstate = $ji->{jobstate};
         $user = $ji->{username};
         $project = $ji->{account}; 
+        $jobname = $ji->{jobname};
         $endtime = $ji->{end_time};
         $runtime = $ji->{runtime};
         $booked = $ji->{procs};
@@ -425,11 +459,12 @@ while ( 1 ) {
             push @flag_list, "nodes_overbooked:" . scalar(@node_list) . ":" . scalar(@file_list);
         }
     }
-    if (@file_list and $booked ne '.' and $total_cores < $booked) {
+    # do not include this flag, it is redundant and reporting simply nodes * cores-per-node
+    if (0 and @file_list and $booked ne '.' and $total_cores < $booked) {
         if ($verbose) {
-            push @flag_list, scalar(@node_list) . " cores booked but " . scalar(@file_list) . " used";
+            push @flag_list, scalar(@node_list) . " total cores booked but " . scalar(@file_list) . " used";
         } else {
-            push @flag_list, "cores_overbooked:" . $booked . ":" . $total_cores;
+            push @flag_list, "cores_overbooked_all:" . $booked . ":" . $total_cores;
         }
     }
     # jobid cluster endtime runtime flag-list booked cores node-list jobstats-file-list
@@ -439,21 +474,31 @@ while ( 1 ) {
     push @fields, $jobstate; # 2
     push @fields, $user; # 3
     push @fields, $project; # 4
-    push @fields, $endtime; # 5
-    push @fields, $runtime; # 6
-    push @fields, (@flag_list ? join(",", @flag_list) : "."); # 7
-    push @fields, $booked; # 8
-    push @fields, (@core_list ? join(",", @core_list) : "."); # 9
-    push @fields, join(",", @node_list); # 10
-    push @fields, (@file_list ? join(",", @file_list) : "."); # 11
+    push @fields, $jobname; # 5
+    push @fields, $endtime; # 6
+    push @fields, $runtime; # 7
+    push @fields, (@flag_list ? join(",", @flag_list) : "."); my $flags_field = 8; # 8
+    push @fields, $booked; # 9
+    push @fields, (@core_list ? join(",", @core_list) : "."); # 10
+    push @fields, join(",", @node_list); # 11
+    push @fields, (@file_list ? join(",", @file_list) : "."); # 12
 
     # if we have files to read, run plot_jobstats.R script to check more flags and produce a plot
     if (@file_list) {
         my $pjs_flags = runPlotJobstats(@fields);
-        $fields[7] = $pjs_flags if $pjs_flags;
+        $fields[$flags_field] = $pjs_flags if $pjs_flags;
     }
 
     print_JobRun(@fields);
 
+}
+
+if (not $quiet) {
+    print STDERR "*** $jobcount total jobs, $jobcount_notrun jobs not run, $no_jobstats_file jobs had no jobstats files (includes jobs not run)\n";
+}
+if ($no_jobstats_file and $quiet) {
+    print STDERR "*** No jobstats files found for $no_jobstats_file out of $jobcount jobs, limited resource usage diagnosis";
+    print STDERR " and no plot produced" if $do_plot;
+    print STDERR "\n";
 }
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env Rscript
 
-# #!/usr/bin/Rscript
-
 # see processArgs() for command-line argument structure
 
-.version = "2015-02-10"
+.version = "2015-02-11"
 
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
 # TODO: set limits below using arguments
@@ -35,19 +33,24 @@ node.types = list(
   kalkyl=c(mem24GB=24, mem48GB=48,  mem72GB=72),      kalkyl.default="mem24GB",
   tintin=c(mem64GB=64, mem128GB=128),                 tintin.default="mem64GB")
 
-main.line = 5
+top.lines = 9
+main.line = top.lines - 2
 main.cex = 1.7
 main.sep = "  "
 user.line = 1.5
 user.cex = 1.4
 user.adj = 0.02
 axis.cex = 1.2
-flags.line = 1
+axis1.line = 2.5
+axis1.cex = 1.2
+axis2.line = 4.2
+flags.line = user.line
 flags.sep = ",  "
 flags.line.sep = ",\n"
-flags.wrap = 2
+flags.wrap = 3
 flags.col = "red3"
 flags.cex = 1.2
+flags.adj = 0.98
 flag_overbooked.fraction = 0.80
 flag_half_overbooked.fraction = 0.5
 flag_severely_overbooked.fraction = 0.25
@@ -60,30 +63,51 @@ processArgs = function(args) {
   job = list()
   while ( 1 ) { switch(args[1],
           "-n" =, "--no-plot" = { do.plot <<- FALSE;       args = args[-1] },
-          "-v" =, "--verbose" = { do.verbose <<- TRUE;     args = args[-1] },
+          "-v" =, "--verbose" = { do.verbose <<- TRUE; flags.wrap <<- 2; args = args[-1] },
           "-m" =, "--memory"  = { do.memory <<- TRUE;      args = args[-1] },
           "-c" =, "--cluster" = { job$cluster <- args[2];  args = args[-c(1, 2)] },
           break)
   }
-  if (args[1] == "-f" || args[1] == "--full") {
-    # a full column-wise set of args as produced by the jobstats Perl script
-    job$data_type = "full"
+  if (args[1] == "--fji" || args[1] == "--finishedjobinfo") {
+    # a finishedjobinfo column-wise set of args as produced by the jobstats Perl script
+    job$data_type = "finishedjobinfo"
     args = args[-1]
-    # jobid cluster endtime runtime flags coresbooked core_list node_list jobstats_file_list
+    # jobid cluster jobstate user project jobname endtime runtime flags coresbooked core_list node_list jobstats_file_list
     job$jobid     = as.integer(args[1])
     job$cluster   = if (is.null(job$cluster)) as.character(args[2])
     job$jobstate  = as.character(args[3])
     job$user      = as.character(args[4])
     job$project   = as.character(args[5])
-    job$endtime   = as.character(args[6])
-    job$runtime   = as.character(args[7])
-    job$flag_list = if (args[8] == ".") character(0)
-                    else unlist(strsplit(args[8], ",", fixed=TRUE))
-    job$booked    = if (args[9] == ".") NA
-                    else as.integer(args[9])
-    job$core_list = as.integer(unlist(strsplit(args[10], ",", fixed=TRUE)))
-    job$node_list = unlist(strsplit(args[11], ",", fixed=TRUE))
-    job$file_list = unlist(strsplit(args[12], ",", fixed=TRUE))
+    job$jobname   = as.character(args[6])
+    job$endtime   = as.character(args[7])
+    job$runtime   = as.character(args[8])
+    job$initial_flag_list = if (args[idx <- 9] == ".") character(0)
+                    else unlist(strsplit(args[idx], ",", fixed=TRUE))
+    job$booked    = if (args[idx <-10] == ".") NA
+                    else as.integer(args[idx])
+    job$core_list = as.integer(unlist(strsplit(args[11], ",", fixed=TRUE)))
+    job$node_list = unlist(strsplit(args[12], ",", fixed=TRUE))
+    job$file_list = unlist(strsplit(args[13], ",", fixed=TRUE))
+  } else if (args[1] == "--db" || args[1] == "--database") {
+    # column-wise set of args as produced by Martin Dahlo's sqlite3 database
+    job$data_type = "database"
+    args = args[-1]
+    # jobid cluster jobstate user project jobname endtime runtime flags coresbooked core_list node_list jobstats_file_list
+    job$jobid     = as.integer(args[1])
+    job$cluster   = if (is.null(job$cluster)) as.character(args[2])
+    job$jobstate  = as.character(args[3])
+    job$user      = as.character(args[4])
+    job$project   = as.character(args[5])
+    job$jobname   = as.character(args[6])
+    job$endtime   = as.character(args[7])
+    job$runtime   = as.character(args[8])
+    job$initial_flag_list = if (args[idx <- 9] == ".") character(0)
+                    else unlist(strsplit(args[idx], ",", fixed=TRUE))
+    job$booked    = if (args[idx <-10] == ".") NA
+                    else as.integer(args[idx])
+    job$core_list = as.integer(unlist(strsplit(args[11], ",", fixed=TRUE)))
+    job$node_list = unlist(strsplit(args[12], ",", fixed=TRUE))
+    job$file_list = unlist(strsplit(args[13], ",", fixed=TRUE))
   } else {
     # arguments are a list of jobstats files
     job$data_type = "file"
@@ -93,6 +117,7 @@ processArgs = function(args) {
     # dummy up a node list
     job$node_list = job$file_list
   }
+  job$flag_list = character(0)
   job$data_list = list()
   return(job)
 }
@@ -258,10 +283,13 @@ plotJobstats = function(job, do.png=TRUE) {
     png(plotFilename(job), width=width, height=height)
 
   opa = par(no.readonly=TRUE)
-  par(mfrow=c(n.rows, n.columns), oma=c(0, 0, 7, 0))
+  par(mfrow=c(n.rows, n.columns), oma=c(0, 0, top.lines, 0))
   # plot the individual panels for the nodes for which we have data
-  for (n in names(job$data_list)) {
-    plotJobstatsPanel( job$data_list[[ n ]], n )
+  for (i in seq_along(names(job$data_list))) {
+    this.row = ifelse(n.panels == 1, 0, as.integer(i / 2 + 0.5))
+    this.col = ifelse(n.panels == 1, 0, ifelse(i %% 2, 1, 2))
+    n <- names(job$data_list)[i]
+    plotJobstatsPanel( job$data_list[[ n ]], n , this.row, this.col)
   }
   if (n.panels > n.jobstats) {
     # now plot the individual panels for the unused nodes
@@ -280,45 +308,50 @@ plotJobstats = function(job, do.png=TRUE) {
     txt = paste(sep=main.sep, txt, paste("runtime:", job$runtime))
   mtext(txt, font=2, cex=main.cex, line=main.line, side=3, outer=TRUE)
 
-  # User and project lines
-  txt = paste0("User: ", job$user, "\n", "Proj: ", job$project)
+  if (n.rows > 2) {
+    user.line = user.line - 1
+    flags.line = flags.line - 1
+  }
+
+  # User, project and jobname lines
+  txt = paste0("User: ", job$user, "\n", "Proj: ", job$project, "\n", "Jobname: ", job$jobname)
   mtext(txt, font=2, cex=user.cex, line=user.line, side=3, adj=user.adj, outer=TRUE)
 
   # Flags in red
-  flags.header = if (n.panels > 1) paste("Flags (based on node", job$node_list[1], "only):\n") else "Flags:"
-  if (n.panels > 1) flags.line = -1
-  flags.list = character(0)
-  if (length(job$flag_list) == 0) {
-    flags.list = "none"
-  } else if (length(job$flag_list) <= flags.wrap) {
-    flags.list = paste(collapse=flags.sep, job$flag_list)
+  # Flags passed in job$initial_flag_list, flags determined here job$flag_list
+  flags.output = character(0)
+  flags.list = c(job$initial_flag_list, job$flag_list)
+  flags.count = length(flags.list)
+  if (flags.count == 0) {
+    flags.output = "Flags: none"
+  } else if (flags.count <= flags.wrap) {
+    flags.output = paste(collapse=flags.sep, flags.list)
   } else {
-    cat
-    flags.list = paste(collapse=flags.sep, job$flag_list[1:flags.wrap])
+    flags.output = paste(collapse=flags.sep, flags.list[1:flags.wrap])
     i = flags.wrap + 1
-    while ((i + flags.wrap - 1) <= length(job$flag_list)) {
+    while ((i + flags.wrap - 1) <= flags.count) {
       j = i + flags.wrap - 1
-      flags.list = paste(sep=flags.line.sep,
-                         flags.list,
-                         paste(collapse=flags.sep, job$flag_list[i:j]))
+      flags.output = paste(sep=flags.line.sep,
+                           flags.output,
+                           paste(collapse=flags.sep, flags.list[i:j]))
       i = i + flags.wrap
     }
-    if (i <= length(job$flag_list)) {
-      flags.list = paste(sep=flags.line.sep,
-                        flags.list,
-                        paste(collapse=flags.sep, job$flag_list[i:length(job$flag_list)]))
+    if (i <= flags.count) {
+      flags.output = paste(sep=flags.line.sep, flags.output,
+                           paste(collapse=flags.sep, flags.list[i:flags.count]))
     }
   }
-  txt = paste(flags.header, flags.list)
-  mtext(txt, font=1, cex=flags.cex, line=flags.line, side=3, outer=TRUE, col=flags.col)
+  #txt = paste(flags.output)
+  mtext(flags.output, font=1, cex=flags.cex, line=flags.line, side=3, outer=TRUE, col=flags.col, adj=flags.adj)
   par(opa)
 
   if (do.png)
     graphics.off()
 }
 
-plotJobstatsPanel = function(dat, node="unknown") {
+plotJobstatsPanel = function(dat, node="unknown", this.row=0, this.col=0) {
 
+  # cat("this.row = ", this.row, "  this.col = ", this.col, "\n")
   # use job list, already defined in this file
 
   num.cores = ncol(dat) - first.core.column + 1
@@ -349,16 +382,22 @@ plotJobstatsPanel = function(dat, node="unknown") {
   with(dat, plot(x, GB_USED, xlim=range.x, ylim=range.GB,
                  col=col.GB, type="l", lwd=2, lty=lty.GB,
                  bty="U",
-                 main=node,
-                 xlab=paste0("Wall minutes since job start (5 min resolution, max ",
-                             range.x[2], " min)"),
-                 ylab=paste0("GB used (max ",range.GB[2]," GB)"),
-                 cex.axis=axis.cex, cex.lab=axis.cex))
+                 main=node, cex.main=1.5,
+                 #xlab=paste0("Wall minutes since job start (5 min resolution, max ", range.x[2], " min)"),
+                 #ylab=ifelse(this.col <= 1, paste0("GB used (max ",range.GB[2]," GB)"), ""),
+                 xlab="",
+                 ylab="",
+                 cex.axis=axis.cex))
+  mtext(paste0("Wall minutes since job start (5 min resolution, max ", range.x[2], " min)"),
+        side=1, line=axis1.line, las=0, col=col.GB, cex=axis1.cex)
+  mtext(ifelse(this.col <= 1, paste0("GB used (max ",range.GB[2]," GB)"), ""),
+        side=2, line=axis1.line, las=0, col=col.GB, cex=axis1.cex)
   with(dat, lines(x, core_, col=col.core, lwd=2, lty=lty.core))
   #
   axis(4, at=core.at, labels=core.labels, col.axis=col.core, cex.axis=axis.cex)
-  mtext(paste0("Core busy for ", num.cores, " cores (max ", num.cores * 100,"%)"),
-        side=4, line=3.8, las=0, col=col.core, cex=axis.cex)
+  if (this.col %in% c(0, 2))
+    mtext(paste0("Core busy for ", num.cores, " cores (max ", num.cores * 100,"%)"),
+          side=4, line=axis2.line, las=0, col=col.core, cex=axis.cex)
   with(dat, points(x, swap_, pch=16, col="red"))
   if (any(! is.na(dat$swap_)))
     legend("topleft", legend="Swap\nused", bty="n", pch=pch.swap, col=col.swap,
@@ -373,7 +412,7 @@ gatherAllJobstats = function(job) {
     attr(job$data_list[[ node ]], "cluster") = job$cluster
   }
   job$swap_used = any(unlist(lapply(job$data_list, function(x) any(x$GB_SWAP_USED > 0))))
-  job$flag_list = c(job$flag_list, produceFlags(job$data_list[[1]]))
+  job$flag_list = produceFlags(job$data_list[[1]])
   return(job)
 }
 

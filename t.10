@@ -1,0 +1,1 @@
+2015-02-04 14:30:00 jobid=6489228 jobstate=COMPLETED username=lka account=staff nodes=ti[15-24] procs=160 partition=node qos=normal jobname=sbatch maxmemory_in_GiB=19.4 maxmemory_node=ti18 timelimit=01:00:00 submit_time=2015-02-04T14:26:05 start_time=2015-02-04T14:26:06 end_time=2015-02-04T14:30:00 runtime=00:03:54 margin=00:56:06 queuetime=00:00:01
