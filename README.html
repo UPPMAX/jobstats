@@ -1,0 +1,119 @@
+<h1 id="discovering-job-statistics-with-jobstats">Discovering job statistics with <code>jobstats</code></h1>
+<p>UPPMAX provides <code>jobstats</code> to enable discovery of resource usage for jobs submitted to the SLURM job queue.</p>
+<pre><code>jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
+<p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the usage flags. Plots are saved to the current directory with the name</p>
+<pre><code>cluster-jobid-project-user.png</code></pre>
+<div class="figure">
+<img src="" />
+</div>
+<p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. In this case the plot will contain a blank panel for each such node together with the message 'node booked but unused'.</p>
+<h1 id="modes-of-jobstats-discovery">Modes of jobstats discovery</h1>
+<p>There are four basic modes for discovery, depending on what the user provides on the command line: (1) discovery by job number; (2) discovery by node and job number; (3) discovery by project; or (4) discovery via information provided on <code>stdin</code>. In of the example command lines below, the <code>-p</code>/<code>--plot</code> option requests that plots of job resource usage are created.</p>
+<p><strong>Mode 1:</strong> <code>jobstats -p jobid1 jobid2 jobid3</code></p>
+<p>Job numbers valid on the cluster. <code>finishedjobinfo</code> is used to determine further information for each job. This can be rather slow, so if multiple queries are expected it would be quicker to run <code>finishedjobinfo</code> yourself separately, see Mode 4 below.</p>
+<p><strong>Mode 2:</strong> <code>jobstats -p -n m15,m16 jobid</code></p>
+<p><code>finishedjobinfo</code> is <em>not</em> called and Uppmax's stored job statistics files are discovered directly. If you know which node(s) your job ran on or which nodes you are interested in, this will be much faster than Mode 1.</p>
+<p><strong>Mode 3:</strong> <code>jobstats -p -A project</code></p>
+<p>When providing a project name that is valid for the cluster, <code>finishedjobinfo</code> is used to determine further information on jobs run within the project. As for Mode 1, this can be rather slow. Furthermore only <code>finishedjobinfo</code> defaults for time span etc. are used for job discovery. If multiple queries are expected or additional <code>finishedjobinfo</code> options are desired, see Mode 4 below.</p>
+<p><strong>Mode 4:</strong> <code>finishedjobinfo -q project | jobstats - -p</code></p>
+<p>Accept input on stdin formatted like <code>finishedjobinfo</code> output. The long form of this option is '--stdin'. This mode can be especially useful if multiple queries of the same job information are expected. In this case, save the output of a single comprehensive <code>finishedjobinfo</code> query, and extract the parts of interest and present them to this script on stdin. For example, to produce analyses of all completed jobs in a project during the current calendar year, and produce separate tarballs analysing all jobs and providing jobstats plots for each user during this same period:</p>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="kw">finishedjobinfo</span> -q -y project <span class="kw">&gt;</span> proj-year.txt
+<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> proj-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - <span class="kw">&gt;</span> all-completed-jobs.txt
+<span class="kw">grep</span> <span class="st">&#39;username=user1&#39;</span> proj-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - -p <span class="kw">&gt;</span> user1-jobs.txt
+<span class="kw">tar</span> czf user1-jobs.tar.gz user1-jobs.txt *-project-user1.png
+<span class="kw">grep</span> <span class="st">&#39;username=user2&#39;</span> proj-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - -p <span class="kw">&gt;</span> user2-jobs.txt
+<span class="kw">tar</span> czf user2-jobs.tar.gz user2-jobs.txt *-project-user2.png
+<span class="kw">...</span></code></pre>
+<h1 id="command-line-options">Command-Line Options</h1>
+<p><code>jobstats -h</code> may be specified to get detailed help including a complete list of command line options.</p>
+<pre><code>    -M cluster         Cluster on which jobs were run [default current cluster]
+
+    -A project         Project valid on the cluster.  finishedjobinfo is used to
+                       discover jobs for the project.  See further comments 
+                       under &#39;Mode 3&#39; above.
+
+    -n node[,node...]  Cluster node(s) on which the job was run.  If specified,
+                       then the finishedjobinfo script is not run and discovery
+                       is restricted to only the specified nodes.  Nodes can be 
+                       specified as a comma-separated list of complete node 
+                       names, or using the finishedjobinfo syntax:
+                             m78,m90,m91,m92,m100  or  m[78,90-92,100]
+                       Nonsensical results will occur if the syntaxes are mixed.
+
+    - | --stdin        Accept input on stdin formatted like finishedjobinfo 
+                       output.  The short form of this option is a single dash 
+                       &#39;-&#39;.
+                       
+    -m | --memory      Always include memory usage flags in output.  Default 
+                       behaviour is to include memory usage flags only if CPU 
+                       usage flags are also present.
+
+    -s | --source  fji | db
+                       Source of the input data.  Default is &#39;fji&#39;, the
+                       finishedjobinfo script. &#39;db&#39; may be used to access a more
+                       rapid but less comprehensive database of job information.
+                       This may also be used with the - flag when sending job
+                       information via stdin.  &#39;-s db&#39; is currently unsupported.
+
+    -v | --verbose     Be wordy when describing flag values.
+
+    -p | --plot        Produce CPU and memory usage plot for each jobid
+
+    -q | --quiet       Do not produce table output
+
+    -d                 Produce a header for table output
+
+    -h | --help | -?   Produce detailed help information
+
+
+The following command-line options are generally only useful for Uppmax staff.
+
+    -x directory       Directory prefix to use for jobstats files.  Default is
+                       &#39;/sw/share/slurm&#39;, and directory structure is 
+
+                       &lt;prefix&gt;/&lt;cluster&gt;/uppmax_jobstats/&lt;node&gt;/&lt;jobid&gt;
+
+    -X directory       Hard directory prefix to use for jobstats files.  
+                       Jobstats files are assumed available directly: 
+                           &#39;&lt;hard-prefix&gt;/&lt;jobid&gt;&#39;
+    -f file            finishedjobinfo script
+    -r file            plot_jobstats script</code></pre>
+<h1 id="further-details">Further Details</h1>
+<p>This script produces two types of output. If the <code>-p</code>/<code>--plot</code> command line option is provided, a plot is created of core and memory usage across the life of the job. The name of the file produced has the format:</p>
+<pre><code>cluster-jobid-project-user.png</code></pre>
+<p>Unless the <code>-q</code>/<code>--quiet</code> option is provided, a table is also produces containing lines with the following tab-separated fields:</p>
+<pre><code>jobid cluster jobstate user project endtime runtime flags booked cores node[,node...] jobstats[,jobstats...] </code></pre>
+<p>Field contents:</p>
+<ul>
+<li><code>jobid</code> : Job ID</li>
+<li><code>cluster</code> : Cluster on which the job was run</li>
+<li><code>jobstate</code> : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED</li>
+<li><code>user</code> : Username that submitted the job</li>
+<li><code>project</code> : Project account under which the job was run</li>
+<li><code>endtime</code> : End time of the job (with -n, this is '.')</li>
+<li><code>runtime</code> : Runtime of the job (with -n, this is '.')</li>
+<li><code>flags</code> : Flags indicating various types of resource underutilizations</li>
+<li><code>booked</code> : Number of booked cores (with -n, this is '.')</li>
+<li><code>cores</code> : Number of cores represented in the discovered jobstats files.</li>
+<li><code>node</code> : Node(s) booked for the job, expanded into individual node names, separated by commas ','; if no nodes were found, this is '.'. The nodes for which jobstats files are available are listed first.</li>
+<li><code>jobstats</code> : jobstats files for the nodes, in the same order the nodes are listed, separated by commas ','; if no jobstats files, this is '.'</li>
+</ul>
+<h1 id="flags">Flags</h1>
+<p>An important part of <code>jobstats</code> output are usage flags. These provide indications that booked resources might have been underused, either processor cores, or memory, or both.</p>
+<p>In both plot and table output, flags are a comma-separated list of cautions regarding core and/or memory underutilisation. The appearance of a flag does not necessarily mean that resources were used incorrectly. It depends upon the tools being used and the contents of the SLURM header, and also depends upon the job profile. Because usage information is gathered every 5 minutes, higher transient usage of cores or memory may not be captured in the log files.</p>
+<p>Flags most likely to represent real overbooking of resources are <code>nodes_overbooked</code>, <code>overbooked</code>, <code>!!half_overbooked</code>, <code>!!severely_overbooked</code>, and <code>!!swap_used</code>.</p>
+<p>For multinode jobs, flags other than <code>nodes_overbooked</code> are determined based only on the usage of the first node. Multinode jobs require careful analysis so as to not waste resources unnecessarily, and it is a common mistake among beginning Uppmax users to book multiple nodes and run tools that cannot use more than the first. In this case, <code>nodes_overbooked</code> will appear.</p>
+<p>Some flags have a threshold below which they appear. The default format is generally <code>flag:value-booked:value-used</code>.</p>
+<ul>
+<li><code>nodes_overbooked : nodes booked : nodes used</code> : More nodes were booked than used</li>
+<li><code>overbooked : % used</code> : The maximum percentage of booked cores and/or memory that was used (if &lt; 80%)</li>
+<li><code>!!half_overbooked</code> : No more than 1/2 of both cores and memory of a node was used; consider booking half a node instead.</li>
+<li><code>!!severely_overbooked</code> : No more than 1/4 of both cores and memory of a node was used, examine your job requirements closely.</li>
+<li><code>!!swap_used</code> : Swap storage was used at any point within the job run</li>
+<li><code>node_type_overbooked : type booked : type used</code> : A fat node was requested that was larger than was needed. This flag may be produced spuriously if SLURM ran the job on a fat node when a fat node was not requested by the user.</li>
+<li><code>cores_overbooked : cores booked : cores used</code> : More cores were booked than used (if &lt; 80%)</li>
+<li><code>mem_overbooked : GB booked : GB used</code> : More memory was available than was used (if &lt; 25% and more than one core).</li>
+<li><code>core_mem_overbooked : GB in used cores : GB used</code> : Less memory was used than was available in the cores that were used (if &lt; 50%).</li>
+</ul>
+<p>By default no flags are indicated for jobs with memory-only cautions except for swap usage, because it is common for jobs to heavily use processor cores without using a sizable fraction of memory. Use the <code>-m</code>/<code>--memory</code> option to include flags for memory underutilisation when those would be the only flags produced.</p>
+<p>More verbose flags are output with the <code>-v</code>/<code>--verbose</code> option.</p>
