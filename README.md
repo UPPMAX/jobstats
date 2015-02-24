@@ -15,7 +15,7 @@ directory with the name
 
 An example plot:
 
-![](milou-4535835-b2013277-douglas.png)
+![](example-plot.png)
 
 For multiple-node jobs, plots have a two-column format.
 
