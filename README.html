@@ -1,11 +1,13 @@
 <h1 id="discovering-job-statistics-with-jobstats">Discovering job statistics with <code>jobstats</code></h1>
 <p>UPPMAX provides <code>jobstats</code> to enable discovery of resource usage for jobs submitted to the SLURM job queue.</p>
 <pre><code>jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
-<p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the usage flags. Plots are saved to the current directory with the name</p>
+<p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced from the jobstats for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the usage flags. Plots are saved to the current directory with the name</p>
 <pre><code>cluster-jobid-project-user.png</code></pre>
+<p>An example plot:</p>
 <div class="figure">
-<img src="" />
+<img src="milou-4535835-b2013277-douglas.png" />
 </div>
+<p>For multiple-node jobs, plots have a two-column format.</p>
 <p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. In this case the plot will contain a blank panel for each such node together with the message 'node booked but unused'.</p>
 <h1 id="modes-of-jobstats-discovery">Modes of jobstats discovery</h1>
 <p>There are four basic modes for discovery, depending on what the user provides on the command line: (1) discovery by job number; (2) discovery by node and job number; (3) discovery by project; or (4) discovery via information provided on <code>stdin</code>. In of the example command lines below, the <code>-p</code>/<code>--plot</code> option requests that plots of job resource usage are created.</p>
@@ -90,14 +92,16 @@ The following command-line options are generally only useful for Uppmax staff.
 <li><code>jobstate</code> : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED</li>
 <li><code>user</code> : Username that submitted the job</li>
 <li><code>project</code> : Project account under which the job was run</li>
-<li><code>endtime</code> : End time of the job (with -n, this is '.')</li>
-<li><code>runtime</code> : Runtime of the job (with -n, this is '.')</li>
+<li><code>endtime</code> : End time of the job (with <code>-n/--node</code>, this is <code>.</code>)</li>
+<li><code>runtime</code> : Runtime of the job (with <code>-n/--node</code>, this is <code>.</code>)</li>
 <li><code>flags</code> : Flags indicating various types of resource underutilizations</li>
-<li><code>booked</code> : Number of booked cores (with -n, this is '.')</li>
+<li><code>booked</code> : Number of booked cores (with <code>-n/--node</code>, this is <code>.</code>)</li>
 <li><code>cores</code> : Number of cores represented in the discovered jobstats files.</li>
-<li><code>node</code> : Node(s) booked for the job, expanded into individual node names, separated by commas ','; if no nodes were found, this is '.'. The nodes for which jobstats files are available are listed first.</li>
-<li><code>jobstats</code> : jobstats files for the nodes, in the same order the nodes are listed, separated by commas ','; if no jobstats files, this is '.'</li>
+<li><code>node</code> : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is <code>.</code>. The nodes for which jobstats files are available are listed first.</li>
+<li><code>jobstats</code> : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is <code>.</code></li>
 </ul>
+<p>At completion of the script, a brief summary is produced:</p>
+<pre><code>*** No jobstats files found for 25 out of 56 jobs, limited resource usage diagnosis and no plot produced</code></pre>
 <h1 id="flags">Flags</h1>
 <p>An important part of <code>jobstats</code> output are usage flags. These provide indications that booked resources might have been underused, either processor cores, or memory, or both.</p>
 <p>In both plot and table output, flags are a comma-separated list of cautions regarding core and/or memory underutilisation. The appearance of a flag does not necessarily mean that resources were used incorrectly. It depends upon the tools being used and the contents of the SLURM header, and also depends upon the job profile. Because usage information is gathered every 5 minutes, higher transient usage of cores or memory may not be captured in the log files.</p>
@@ -107,8 +111,8 @@ The following command-line options are generally only useful for Uppmax staff.
 <ul>
 <li><code>nodes_overbooked : nodes booked : nodes used</code> : More nodes were booked than used</li>
 <li><code>overbooked : % used</code> : The maximum percentage of booked cores and/or memory that was used (if &lt; 80%)</li>
-<li><code>!!half_overbooked</code> : No more than 1/2 of both cores and memory of a node was used; consider booking half a node instead.</li>
-<li><code>!!severely_overbooked</code> : No more than 1/4 of both cores and memory of a node was used, examine your job requirements closely.</li>
+<li><code>!!half_overbooked</code> : No more than one-half of both cores and memory of a node was used; consider booking half a node instead.</li>
+<li><code>!!severely_overbooked</code> : No more than one-quarter of both cores and memory of a node was used, examine your job requirements closely.</li>
 <li><code>!!swap_used</code> : Swap storage was used at any point within the job run</li>
 <li><code>node_type_overbooked : type booked : type used</code> : A fat node was requested that was larger than was needed. This flag may be produced spuriously if SLURM ran the job on a fat node when a fat node was not requested by the user.</li>
 <li><code>cores_overbooked : cores booked : cores used</code> : More cores were booked than used (if &lt; 80%)</li>

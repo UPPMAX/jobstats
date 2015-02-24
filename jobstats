@@ -200,16 +200,17 @@ Field contents:
   jobstate : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED
   user     : Username that submitted the job
   project  : Project account under which the job was run
-  endtime  : End time of the job (with -n, this is '.')
-  runtime  : Runtime of the job (with -n, this is '.')
+  endtime  : End time of the job (with -n/--node, this is '.')
+  runtime  : Runtime of the job (with -n/--node, this is '.')
   flags    : Flags indicating various types of resource underutilizations
-  booked   : Number of booked cores (with -n, this is '.')
+  booked   : Number of booked cores (with -n/--node, this is '.')
   cores    : Number of cores represented in the discovered jobstats files.
   node     : Node(s) booked for the job, expanded into individual node names,
-             separated by commas ','; if no nodes were found, this is '.'.  
+             separated by commas; if no nodes were found, this is '.'.  
              The nodes for which jobstats files are available are listed first.
   jobstats : jobstats files for the nodes, in the same order the nodes are 
-             listed, separated by commas ','; if no jobstats files, this is '.'
+             listed, separated by commas; if no jobstats files were discovered,
+             this is '.'
 
 FLAGS
 -----

@@ -6,14 +6,18 @@ to the SLURM job queue.
 
     jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]
 
-With the `-p`/`--plot` option, a plot is produced for each jobid.  Plots contain one
-panel per booked node showing CPU and memory usage, and include lines
-indicating the usage flags.  Plots are saved to the current directory with the
-name
+With the `-p`/`--plot` option, a plot is produced from the jobstats for each
+jobid.  Plots contain one panel per booked node showing CPU and memory usage,
+and include lines indicating the usage flags.  Plots are saved to the current
+directory with the name
 
     cluster-jobid-project-user.png
 
-![]()
+An example plot:
+
+![](milou-4535835-b2013277-douglas.png)
+
+For multiple-node jobs, plots have a two-column format.
 
 Note that not all jobs will produce jobstats files, particularly if the job was
 cancelled or ran for less than 5 minutes.  Also, if a job booked nodes
@@ -157,13 +161,18 @@ Field contents:
 * `jobstate` : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED
 * `user`     : Username that submitted the job
 * `project`  : Project account under which the job was run
-* `endtime`  : End time of the job (with -n, this is '.')
-* `runtime`  : Runtime of the job (with -n, this is '.')
+* `endtime`  : End time of the job (with `-n/--node`, this is `.`)
+* `runtime`  : Runtime of the job (with `-n/--node`, this is `.`)
 * `flags`    : Flags indicating various types of resource underutilizations
-* `booked`   : Number of booked cores (with -n, this is '.')
+* `booked`   : Number of booked cores (with `-n/--node`, this is `.`)
 * `cores`    : Number of cores represented in the discovered jobstats files.
-* `node`     : Node(s) booked for the job, expanded into individual node names, separated by commas ','; if no nodes were found, this is '.'.  The nodes for which jobstats files are available are listed first.
-* `jobstats` : jobstats files for the nodes, in the same order the nodes are listed, separated by commas ','; if no jobstats files, this is '.'
+* `node`     : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is `.`.  The nodes for which jobstats files are available are listed first.
+* `jobstats` : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is `.`
+
+At completion of the script, a brief summary is produced:
+
+    *** No jobstats files found for 25 out of 56 jobs, limited resource usage diagnosis and no plot produced
+
 
 
 Flags
@@ -195,8 +204,8 @@ generally `flag:value-booked:value-used`.
 
 * `nodes_overbooked : nodes booked : nodes used` : More nodes were booked than used
 * `overbooked : % used` : The maximum percentage of booked cores and/or memory that was used (if &lt; 80%)
-* `!!half_overbooked` : No more than 1/2 of both cores and memory of a node was used; consider booking half a node instead.
-* `!!severely_overbooked` : No more than 1/4 of both cores and memory of a node was used, examine your job requirements closely.
+* `!!half_overbooked` : No more than one-half of both cores and memory of a node was used; consider booking half a node instead.
+* `!!severely_overbooked` : No more than one-quarter of both cores and memory of a node was used, examine your job requirements closely.
 * `!!swap_used` : Swap storage was used at any point within the job run
 * `node_type_overbooked : type booked : type used` : A fat node was requested that was larger than was needed.  This flag may be produced spuriously if SLURM ran the job on a fat node when a fat node was not requested by the user.
 * `cores_overbooked : cores booked : cores used` : More cores were booked than used (if &lt; 80%)
