@@ -8,8 +8,9 @@ to the SLURM job queue.
 
 With the `-p`/`--plot` option, a plot is produced from the jobstats for each
 jobid.  Plots contain one panel per booked node showing CPU and memory usage,
-and include lines indicating the usage flags.  Plots are saved to the current
-directory with the name
+and include lines indicating the job number, cluster, end time and duration,
+user, project, job name, and usage flags (more on those below). Plots are saved
+to the current directory with the name
 
     cluster-jobid-project-user.png
 
@@ -37,16 +38,17 @@ requests that plots of job resource usage are created.
 
 **Mode 1:**  `jobstats -p jobid1 jobid2 jobid3`
 
-Job numbers valid on the cluster.  `finishedjobinfo` is used to determine further
-information for each job.  This can be rather slow, so if multiple queries are
-expected it would be quicker to run `finishedjobinfo` yourself separately, see
-Mode 4 below.
+The job numbers valid on the cluster.  `finishedjobinfo` is used to determine
+further information for each job.  This can be rather slow, so if multiple
+queries are expected it would be quicker to run `finishedjobinfo` yourself
+separately, see Mode 4 below.
 
 **Mode 2:**  `jobstats -p -n m15,m16 jobid`
 
-`finishedjobinfo` is *not* called and Uppmax's stored job statistics files are
-discovered directly.  If you know which node(s) your job ran on or which nodes
-you are interested in, this will be much faster than Mode 1.
+`finishedjobinfo` is *not* called and Uppmax's stored job statistics files for
+the cluster of interest are discovered directly.  If you know which node(s)
+your job ran on or which nodes you are interested in, this will be much faster
+than Mode 1.
 
 **Mode 3:**  `jobstats -p -A project`
 
@@ -59,14 +61,15 @@ below.
 
 **Mode 4:**  `finishedjobinfo -q project | jobstats - -p`
 
-Accept input on stdin formatted like `finishedjobinfo` output.  The long form of
-this option is '--stdin'.  This mode can be especially useful if multiple
-queries of the same job information are expected.  In this case, save the
-output of a single comprehensive `finishedjobinfo` query, and extract the parts
-of interest and present them to this script on stdin.  For example, to produce
-analyses of all completed jobs in a project during the current calendar year,
-and produce separate tarballs analysing all jobs and providing jobstats plots
-for each user during this same period:
+Accept input on stdin formatted like `finishedjobinfo` output.  Note the single
+dash `-` option given to `jobstats`; the long form of this option is '--stdin'.
+This mode can be especially useful if multiple queries of the same job
+information are expected.  In this case, save the output of a single
+comprehensive `finishedjobinfo` query, and extract the parts of interest and
+present them to this script on stdin.  For example, to produce analyses of all
+completed jobs in a project during the current calendar year, and produce
+separate tarballs analysing all jobs and providing jobstats plots for each user
+during this same period:
 
 ```bash
 finishedjobinfo -q -y project > proj-year.txt
