@@ -253,7 +253,7 @@ produceFlags <- function(dat) {
     include_memory_flag <- do.memory || any(flag_cores_overbooked, flag_half_overbooked, 
         flag_severely_overbooked)
     
-    createFlag <- function(avail, used, msg, verbose_msg) {
+    createFlag <- function(avail, used, verbose_msg, msg) {
         if (do.verbose)
             if (is.null(avail)) verbose_msg
             else paste(avail, verbose_msg, "but", used, "used")
@@ -292,7 +292,9 @@ produceFlags <- function(dat) {
     if (flag_node_type_overbooked)
         flag_list <- c(flag_list,
                        createFlag(node.type.booked,
-                                  paste("resources of a", node.type.needed, "were"),
+                                  ifelse(do.verbose, 
+                                         paste("resources of a", node.type.needed, "were"),
+                                         node.type.needed),
                                   "node was booked",
                                   "node_type_overbooked"))
     
@@ -428,7 +430,7 @@ plotJobstats <- function(job, do.png = TRUE) {
 plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0) {
     
     if (.debug)
-        cat('this.row = ', this.row, ' this.col = ', this.col, '\n') use job
+        cat('this.row = ', this.row, ' this.col = ', this.col, '\n')
     
     num.cores <- ncol(dat) - first.core.column + 1
     core.columns <- first.core.column:ncol(dat)

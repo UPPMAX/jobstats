@@ -278,6 +278,7 @@ Version:  $version
 
 GetOptions("M=s"     => \$o_cluster, 
            "n=s"     => \$o_nodes,
+           "A=s"     => \$o_project,
            ""        => \$o_stdin,
            "stdin"   => \$o_stdin,
            "source"  => \$o_source,
@@ -295,11 +296,13 @@ die "$usage$detailed_usage" if $o_help;
 
 @jobs = @ARGV;
 
-($o_cluster and ($o_stdin or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid is required.\n***\n$usage";
+($o_cluster and ($o_stdin or $o_project or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid or -A or --stdin is required.\n***\n$usage";
 
 $o_source = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
 
 my $PREFIX = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/uppmax_jobstats" );
+
+$o_stdin or (-f "$o_finishedjobinfo" or die "\n***\n*** finishedjobinfo script '$o_finishedjobinfo' not available\n***");
 
 -d "$PREFIX" or die "\n***\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n***\n$usage";
 
@@ -333,7 +336,6 @@ sub parseFinishedjobinfoLine($) {
 # discover jobinfo for a single job using finishedjobinfo script
 sub jobInfo($) {
     my $j = shift;
-    -f "$o_finishedjobinfo" or die "\n***\n*** finishedjobinfo script '$o_finishedjobinfo' not available\n***";
     return parseFinishedjobinfoLine(qx($o_finishedjobinfo -q -M $o_cluster -j $j));
 }
 
@@ -439,6 +441,10 @@ sub print_JobRun(@) {
 
 @nodes = parseNodes($o_nodes) if $o_nodes;
 
+if ($o_project) {
+    open(PROJECT, "$o_finishedjobinfo -q -M $o_cluster $o_project |") or die "could not run $o_finishedjobinfo for project '$o_project': $!";
+}
+
 while ( 1 ) {
 
     my $jobid;
@@ -446,6 +452,9 @@ while ( 1 ) {
 
     if ($o_stdin) {
         $input_line = <>;
+        last if ! $input_line;
+    } elsif ($o_project) {
+        $input_line = <PROJECT>;
         last if ! $input_line;
     } else {
         last if ! @jobs;
@@ -473,7 +482,7 @@ while ( 1 ) {
         @node_list = @nodes;
     } else {  # discover using finishedjobinfo or stdin
         my $ji;
-        if ($o_stdin) {
+        if ($o_stdin or $o_project) {
             $ji = parseFinishedjobinfoLine($input_line);
             die "***\n*** Jobid cannot be found, inconsistency in stdin input\n***" if ! $ji;
             $jobid = $ji->{jobid};
