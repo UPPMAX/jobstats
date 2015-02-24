@@ -13,7 +13,7 @@ directory with the name
 
     cluster-jobid-project-user.png
 
-An example plot:
+An example plot, this was named `milou-4535835-b2013277-douglas.png`:
 
 ![](example-plot.png)
 
