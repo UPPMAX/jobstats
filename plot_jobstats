@@ -323,7 +323,7 @@ produceFlags <- function(dat) {
 # Form filename for plot
 #
 plotFilename <- function(job) {
-    paste0(paste(sep = "-", job$cluster, job$jobid, job$project, job$user), 
+    paste0(paste(sep = "-", job$cluster, job$project, job$user, job$jobid), 
         ".png")
 }
 

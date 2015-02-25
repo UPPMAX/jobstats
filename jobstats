@@ -65,7 +65,7 @@ one panel per booked node showing CPU and memory usage, and include lines
 indicating the usage flags.  Plots are saved to the current directory with the
 name
 
-    cluster-jobid-project-user.png
+    cluster-project-user-jobid.png
 
 Note that not all jobs will produce jobstats files, particularly if the job was
 cancelled or ran for less than 5 minutes.  Also, if a job booked nodes
@@ -116,9 +116,9 @@ for each user during this same period:
      finishedjobinfo -q -y project > proj-year.txt
      grep 'jobstat=COMPLETED' proj-year.txt | $NAME - > all-completed-jobs.txt
      grep 'username=user1' proj-year.txt | $NAME - -p > user1-jobs.txt
-     tar czf user1-jobs.tar.gz user1-jobs.txt *-project-user1.png
+     tar czf user1-jobs.tar.gz user1-jobs.txt *-project-user1-*.png
      grep 'username=user2' proj-year.txt | $NAME - -p > user2-jobs.txt
-     tar czf user2-jobs.tar.gz user2-jobs.txt *-project-user2.png
+     tar czf user2-jobs.tar.gz user2-jobs.txt *-project-user2-*.png
      ...
 
 COMMAND-LINE OPTIONS
@@ -186,7 +186,7 @@ This script produces two types of output.  If the -p/--plot command line option
 is provided, a plot is created of core and memory usage across the life of the
 job.  The name of the file produced has the format:
 
-    cluster-jobid-project-user.png
+    cluster-project-user-jobid.png
 
 Unless the -q/--quiet option is provided, a table is also produces containing
 lines with the following tab-separated fields:
