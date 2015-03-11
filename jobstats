@@ -11,11 +11,11 @@
 # DONE: (from lka) memory flag only included if already a cores issue
 # DONE: (from lka) problem with plots from 100-node tintin job, and with 10-node tintin job
 # DONE: include more about user, jobstate in plot and table
-# TODO: add -A to call finishedjobinfo with project name
+# DONE: add -A to call finishedjobinfo with project name
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
-my $version = "2015-02-24";
+my $version = "2015-03-11";
 
 use strict;
 use warnings;
@@ -336,7 +336,9 @@ sub parseFinishedjobinfoLine($) {
 # discover jobinfo for a single job using finishedjobinfo script
 sub jobInfo($) {
     my $j = shift;
-    return parseFinishedjobinfoLine(qx($o_finishedjobinfo -q -M $o_cluster -j $j));
+    my $cmd = "$o_finishedjobinfo -q -M $o_cluster -j $j";
+    print STDERR "Running '$cmd' for more information, please be patient...\n";
+    return parseFinishedjobinfoLine(qx($cmd));
 }
 
 # parse list of nodes returned by finishedjobinfo or provided on -n
@@ -442,7 +444,9 @@ sub print_JobRun(@) {
 @nodes = parseNodes($o_nodes) if $o_nodes;
 
 if ($o_project) {
-    open(PROJECT, "$o_finishedjobinfo -q -M $o_cluster $o_project |") or die "could not run $o_finishedjobinfo for project '$o_project': $!";
+    my $cmd = "$o_finishedjobinfo -q -M $o_cluster $o_project";
+    print STDERR "Running '$cmd' through a pipe to get more information, please be patient...\n";
+    open(PROJECT, "$cmd |") or die "could not run $o_finishedjobinfo for project '$o_project': $!";
 }
 
 while ( 1 ) {

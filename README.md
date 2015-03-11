@@ -39,9 +39,10 @@ requests that plots of job resource usage are created.
 **Mode 1:**  `jobstats -p jobid1 jobid2 jobid3`
 
 The job numbers valid on the cluster.  `finishedjobinfo` is used to determine
-further information for each job.  This can be rather slow, so if multiple
-queries are expected it would be quicker to run `finishedjobinfo` yourself
-separately, see Mode 4 below.
+further information for each job.  This can be rather slow, and a message
+asking for your patience is printed for each job.  If multiple queries are
+expected it would be quicker to run `finishedjobinfo` yourself separately, see
+Mode 4 below.
 
 **Mode 2:**  `jobstats -p -n m15,m16 jobid`
 
@@ -54,10 +55,10 @@ than Mode 1.
 
 When providing a project name that is valid for the cluster, `finishedjobinfo`
 is used to determine further information on jobs run within the project.  As
-for Mode 1, this can be rather slow.  Furthermore only `finishedjobinfo`
-defaults for time span etc. are used for job discovery.  If multiple queries
-are expected or additional `finishedjobinfo` options are desired, see Mode 4
-below.
+for Mode 1, this can be rather slow, and a message asking for your patience is
+printed.  Furthermore only `finishedjobinfo` defaults for time span etc. are
+used for job discovery.  If multiple queries are expected or additional
+`finishedjobinfo` options are desired, see Mode 4 below.
 
 **Mode 4:**  `finishedjobinfo -q project | jobstats - -p`
 
