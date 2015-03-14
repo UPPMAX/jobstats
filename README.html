@@ -2,10 +2,10 @@
 <p>UPPMAX provides <code>jobstats</code> to enable discovery of resource usage for jobs submitted to the SLURM job queue.</p>
 <pre><code>jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
 <p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced from the jobstats for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the job number, cluster, end time and duration, user, project, job name, and usage flags (more on those below). Plots are saved to the current directory with the name</p>
-<pre><code>cluster-jobid-project-user.png</code></pre>
-<p>An example plot, this was named <code>milou-4535835-b2013277-douglas.png</code>:</p>
+<pre><code>cluster-project-user-jobid.png</code></pre>
+<p>An example plot, this was named <code>milou-b2013277-douglas-4535835.png</code>:</p>
 <div class="figure">
-<img src="example-plot.png" /><p class="caption"></p>
+<img src="milou-b2013277-douglas-4535835.png" />
 </div>
 <p>For multiple-node jobs, plots have a two-column format.</p>
 <p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. In this case the plot will contain a blank panel for each such node together with the message 'node booked but unused'.</p>
@@ -19,13 +19,13 @@
 <p>When providing a project name that is valid for the cluster, <code>finishedjobinfo</code> is used to determine further information on jobs run within the project. As for Mode 1, this can be rather slow. Furthermore only <code>finishedjobinfo</code> defaults for time span etc. are used for job discovery. If multiple queries are expected or additional <code>finishedjobinfo</code> options are desired, see Mode 4 below.</p>
 <p><strong>Mode 4:</strong> <code>finishedjobinfo -q project | jobstats - -p</code></p>
 <p>Accept input on stdin formatted like <code>finishedjobinfo</code> output. Note the single dash <code>-</code> option given to <code>jobstats</code>; the long form of this option is '--stdin'. This mode can be especially useful if multiple queries of the same job information are expected. In this case, save the output of a single comprehensive <code>finishedjobinfo</code> query, and extract the parts of interest and present them to this script on stdin. For example, to produce analyses of all completed jobs in a project during the current calendar year, and produce separate tarballs analysing all jobs and providing jobstats plots for each user during this same period:</p>
-<pre class="sourceCode bash"><code class="sourceCode bash">finishedjobinfo -q -y project <span class="kw">&gt;</span> proj-year.txt
-<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> proj-year.txt <span class="kw">|</span> jobstats - <span class="kw">&gt;</span> all-completed-jobs.txt
-<span class="kw">grep</span> <span class="st">&#39;username=user1&#39;</span> proj-year.txt <span class="kw">|</span> jobstats - -p <span class="kw">&gt;</span> user1-jobs.txt
-<span class="kw">tar</span> czf user1-jobs.tar.gz user1-jobs.txt *-project-user1.png
-<span class="kw">grep</span> <span class="st">&#39;username=user2&#39;</span> proj-year.txt <span class="kw">|</span> jobstats - -p <span class="kw">&gt;</span> user2-jobs.txt
-<span class="kw">tar</span> czf user2-jobs.tar.gz user2-jobs.txt *-project-user2.png
-...</code></pre>
+<pre class="sourceCode bash"><code class="sourceCode bash"><span class="ot">project=</span>myproj
+<span class="kw">finishedjobinfo</span> -q -y <span class="ot">${project}</span> <span class="kw">&gt;</span> <span class="ot">${project}</span>-year.txt
+<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - <span class="kw">&gt;</span> <span class="ot">${project}</span>-completed-jobs.txt
+<span class="kw">for</span> <span class="kw">u</span> in user1 user2 user3 <span class="kw">;</span> <span class="kw">do</span>
+    <span class="kw">grep</span> <span class="st">&quot;username=</span><span class="ot">${u}</span><span class="st">&quot;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - -p <span class="kw">&gt;</span> <span class="ot">${u}</span>-jobs.txt
+    <span class="kw">tar</span> czf <span class="ot">${u}</span>-jobs.tar.gz <span class="ot">${u}</span>-jobs.txt *-<span class="ot">${project}</span>-<span class="ot">${u}</span>-*.png
+<span class="kw">done</span></code></pre>
 <h1 id="command-line-options">Command-Line Options</h1>
 <p><code>jobstats -h</code> may be specified to get detailed help including a complete list of command line options.</p>
 <pre><code>    -M cluster         Cluster on which jobs were run [default current cluster]
