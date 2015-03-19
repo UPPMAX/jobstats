@@ -12,10 +12,11 @@
 # DONE: (from lka) problem with plots from 100-node tintin job, and with 10-node tintin job
 # DONE: include more about user, jobstate in plot and table
 # DONE: add -A to call finishedjobinfo with project name
+# DONE: add -b to produce bigger plot with twice the typical dimensions
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 
-my $version = "2015-03-11";
+my $version = "2015-03-19";
 
 use strict;
 use warnings;
@@ -38,6 +39,7 @@ my %source_R_flags = ( fji => "--fji", db => "--db" );
 my $o_cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
 my $o_source          = "fji";
 my $o_plot            = 0;  # -p
+my $o_bigplot         = 0;  # -b
 my $o_memory          = 0;  # -m
 my $o_project;              # -A
 my $o_nodes;                # -n
@@ -156,6 +158,9 @@ COMMAND-LINE OPTIONS
     -v | --verbose     Be wordy when describing flag values.
 
     -p | --plot        Produce CPU and memory usage plot for each jobid
+
+    -b | --big-plot    Produce 'big plot' with double the usual dimensions.
+                       This implies '-p/--plot'.
 
     -q | --quiet       Do not produce table output
 
@@ -276,23 +281,26 @@ Version:  $version
 
 ";
 
-GetOptions("M=s"     => \$o_cluster, 
-           "n=s"     => \$o_nodes,
-           "A=s"     => \$o_project,
-           ""        => \$o_stdin,
-           "stdin"   => \$o_stdin,
-           "source"  => \$o_source,
-           "memory"  => \$o_memory,
-           "verbose" => \$o_verbose,
-           "plot"    => \$o_plot,
-           "d"       => \$o_header,
-           "quiet"   => \$o_quiet,
-           "x=s"     => \$o_prefix,
-           "X=s"     => \$o_hardprefix,
-           "f=s"     => \$o_finishedjobinfo,
-           "r=s"     => \$o_plot_jobstats,
-           "help|?"  => \$o_help) or die "$usage";
+GetOptions("M=s"      => \$o_cluster, 
+           "n=s"      => \$o_nodes,
+           "A=s"      => \$o_project,
+           ""         => \$o_stdin,
+           "stdin"    => \$o_stdin,
+           "source"   => \$o_source,
+           "memory"   => \$o_memory,
+           "verbose"  => \$o_verbose,
+           "plot"     => \$o_plot,
+           "big-plot" => \$o_bigplot,
+           "d"        => \$o_header,
+           "quiet"    => \$o_quiet,
+           "x=s"      => \$o_prefix,
+           "X=s"      => \$o_hardprefix,
+           "f=s"      => \$o_finishedjobinfo,
+           "r=s"      => \$o_plot_jobstats,
+           "help|?"   => \$o_help) or die "$usage";
 die "$usage$detailed_usage" if $o_help;
+
+$o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 @jobs = @ARGV;
 
@@ -410,6 +418,7 @@ sub runPlotJobstats(@) {
     unshift @args, "--memory" if $o_memory;
     unshift @args, "--verbose" if $o_verbose;
     unshift @args, "--no-plot" if ! $o_plot;
+    unshift @args, "--big-plot" if $o_bigplot;
     my $flags = qx($o_plot_jobstats @args);
     chomp $flags;
     return($flags);

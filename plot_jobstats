@@ -34,6 +34,7 @@ options(width = 500)
 
 # Basic plot options
 do.plot <- TRUE  # produce the plot
+do.big.plot <- FALSE  # produce plot with twice the dimensions
 col.GB <- "black"
 lty.GB <- 1  # memory lines
 col.core <- "blue"
@@ -74,7 +75,9 @@ node.types <- list(
     kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72), 
     kalkyl.default = "mem24GB", 
     tintin         = c(mem64GB = 64, mem128GB = 128), 
-    tintin.default = "mem64GB")
+    tintin.default = "mem64GB",
+    halvan         = c(halvan = 1024), 
+    halvan.default = "halvan")
 
 
 
@@ -95,6 +98,8 @@ processArgs <- function(args) {
                                     args <- args[-1] },
             "-c" =, "--cluster" = { job$cluster <- args[2];
                                     args <- args[-c(1, 2)] },
+            "-b" =, "--big-plot" = { do.big.plot <<- TRUE; 
+                                    args <- args[-1] },
             break)
     }
 
@@ -323,7 +328,9 @@ produceFlags <- function(dat) {
 # Form filename for plot
 #
 plotFilename <- function(job) {
-    paste0(paste(sep = "-", job$cluster, job$project, job$user, job$jobid), 
+    p <- ifelse(job$project == ".", "noproj", job$project)
+    u <- ifelse(job$user == ".", "nouser", job$user)
+    paste0(paste(sep = "-", job$cluster, p, u, job$jobid), 
         ".png")
 }
 
@@ -348,6 +355,10 @@ plotJobstats <- function(job, do.png = TRUE) {
     panel.height <- switch(as.character(n.panels), 
                            "1" = 500, "2" = 250, n.rows * 250)
     height <- top.height + panel.height
+    if (do.big.plot) {
+        width <- width * 2
+        height <- height * 2
+    }
     if (.debug) 
         cat("width =", width, " height =", height, "\n")
 
