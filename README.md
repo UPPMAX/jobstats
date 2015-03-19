@@ -12,11 +12,11 @@ and include lines indicating the job number, cluster, end time and duration,
 user, project, job name, and usage flags (more on those below). Plots are saved
 to the current directory with the name
 
-    cluster-jobid-project-user.png
+    cluster-project-user-jobid.png
 
-An example plot, this was named `milou-4535835-b2013277-douglas.png`:
+An example plot, this was named `milou-b2013277-douglas-4535835.png`:
 
-![](example-plot.png)
+![](milou-b2013277-douglas-4535835.png)
 
 For multiple-node jobs, plots have a two-column format.
 
@@ -73,13 +73,13 @@ separate tarballs analysing all jobs and providing jobstats plots for each user
 during this same period:
 
 ```bash
-finishedjobinfo -q -y project > proj-year.txt
-grep 'jobstat=COMPLETED' proj-year.txt | jobstats - > all-completed-jobs.txt
-grep 'username=user1' proj-year.txt | jobstats - -p > user1-jobs.txt
-tar czf user1-jobs.tar.gz user1-jobs.txt *-project-user1.png
-grep 'username=user2' proj-year.txt | jobstats - -p > user2-jobs.txt
-tar czf user2-jobs.tar.gz user2-jobs.txt *-project-user2.png
-...
+project=myproj
+finishedjobinfo -q -y ${project} > ${project}-year.txt
+grep 'jobstat=COMPLETED' ${project}-year.txt | jobstats - > ${project}-completed-jobs.txt
+for u in user1 user2 user3 ; do
+    grep "username=${u}" ${project}-year.txt | jobstats - -p > ${u}-jobs.txt
+    tar czf ${u}-jobs.tar.gz ${u}-jobs.txt *-${project}-${u}-*.png
+done
 ```
 
 Command-Line Options
