@@ -5,7 +5,7 @@
 <pre><code>cluster-project-user-jobid.png</code></pre>
 <p>An example plot, this was named <code>milou-b2013277-douglas-4535835.png</code>:</p>
 <div class="figure">
-<img src="milou-b2013277-douglas-4535835.png" />
+<img src="milou-b2013277-douglas-4535835.png" /><p class="caption"></p>
 </div>
 <p>For multiple-node jobs, plots have a two-column format.</p>
 <p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. In this case the plot will contain a blank panel for each such node together with the message 'node booked but unused'.</p>
@@ -20,10 +20,10 @@
 <p><strong>Mode 4:</strong> <code>finishedjobinfo -q project | jobstats - -p</code></p>
 <p>Accept input on stdin formatted like <code>finishedjobinfo</code> output. Note the single dash <code>-</code> option given to <code>jobstats</code>; the long form of this option is '--stdin'. This mode can be especially useful if multiple queries of the same job information are expected. In this case, save the output of a single comprehensive <code>finishedjobinfo</code> query, and extract the parts of interest and present them to this script on stdin. For example, to produce analyses of all completed jobs in a project during the current calendar year, and produce separate tarballs analysing all jobs and providing jobstats plots for each user during this same period:</p>
 <pre class="sourceCode bash"><code class="sourceCode bash"><span class="ot">project=</span>myproj
-<span class="kw">finishedjobinfo</span> -q -y <span class="ot">${project}</span> <span class="kw">&gt;</span> <span class="ot">${project}</span>-year.txt
-<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - <span class="kw">&gt;</span> <span class="ot">${project}</span>-completed-jobs.txt
-<span class="kw">for</span> <span class="kw">u</span> in user1 user2 user3 <span class="kw">;</span> <span class="kw">do</span>
-    <span class="kw">grep</span> <span class="st">&quot;username=</span><span class="ot">${u}</span><span class="st">&quot;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - -p <span class="kw">&gt;</span> <span class="ot">${u}</span>-jobs.txt
+finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</span> <span class="ot">${project}</span>-year.txt
+<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> jobstats - <span class="kw">&gt;</span> <span class="ot">${project}</span>-completed-jobs.txt
+<span class="kw">for</span> u <span class="kw">in</span> user1 user2 user3 ; <span class="kw">do</span>
+    <span class="kw">grep</span> <span class="st">&quot;username=</span><span class="ot">${u}</span><span class="st">&quot;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> jobstats - -p <span class="kw">&gt;</span> <span class="ot">${u}</span>-jobs.txt
     <span class="kw">tar</span> czf <span class="ot">${u}</span>-jobs.tar.gz <span class="ot">${u}</span>-jobs.txt *-<span class="ot">${project}</span>-<span class="ot">${u}</span>-*.png
 <span class="kw">done</span></code></pre>
 <h1 id="command-line-options">Command-Line Options</h1>
@@ -60,6 +60,9 @@
     -v | --verbose     Be wordy when describing flag values.
 
     -p | --plot        Produce CPU and memory usage plot for each jobid
+
+    -b | --big-plot    Produce &#39;big plot&#39; with double the usual dimensions.
+                       This implies &#39;-p/--plot&#39;.
 
     -q | --quiet       Do not produce table output
 

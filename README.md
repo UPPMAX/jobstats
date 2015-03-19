@@ -122,6 +122,9 @@ of command line options.
 
     -p | --plot        Produce CPU and memory usage plot for each jobid
 
+    -b | --big-plot    Produce 'big plot' with double the usual dimensions.
+                       This implies '-p/--plot'.
+
     -q | --quiet       Do not produce table output
 
     -d                 Produce a header for table output
