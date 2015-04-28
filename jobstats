@@ -15,6 +15,20 @@
 # DONE: add -b to produce bigger plot with twice the typical dimensions
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
+# TODO: coordinate with slurm.epilog
+
+    # These are the args passed to plot_jobstats
+    #
+    # unshift @args, $source_R_flags{$o_source};  # --fji or --db, must be just before @_
+    # unshift @args, "--memory" if $o_memory;
+    # unshift @args, "--verbose" if $o_verbose;
+    # unshift @args, "--no-plot" if ! $o_plot;
+    # unshift @args, "--big-plot" if $o_bigplot;
+    #
+    # 0 = jobid, 1 = cluster, 2 = jobstate, 3 = user, 4 = project, 5 = jobname,
+    # 6 = endtime, 7 = runtime, 8 = current flags, 9 = booked (amount booked?),
+    # 10 = core_list number of cores per node, 11 = node_list node name(s),
+    # 12 = file_list jobstats file(s)
 
 my $version = "2015-03-19";
 
@@ -413,15 +427,22 @@ sub reorderNodeList($$) {
 
 sub runPlotJobstats(@) {
     my @args = @_;
+    # arguments in @args:
+    # 0 = jobid, 1 = cluster, 2 = jobstate, 3 = user, 4 = project, 5 = jobname,
+    # 6 = endtime, 7 = runtime, 8 = current flags, 9 = booked (amount booked?),
+    # 10 = core_list number of cores per node, 11 = node_list node name(s),
+    # 12 = file_list jobstats file(s)
     -f "$o_plot_jobstats" or die "\n***\n*** plot_jobstats.R script '$o_plot_jobstats' not available\n***";
     unshift @args, $source_R_flags{$o_source};  # --fji or --db, must be just before @_
     unshift @args, "--memory" if $o_memory;
     unshift @args, "--verbose" if $o_verbose;
     unshift @args, "--no-plot" if ! $o_plot;
     unshift @args, "--big-plot" if $o_bigplot;
+    # all the above come before the passed-in args, if they apply
     my $flags = qx($o_plot_jobstats @args);
     chomp $flags;
     return($flags);
+
 }
 
 sub print_JobNotRun($) {
