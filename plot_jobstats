@@ -133,6 +133,35 @@ processArgs <- function(args) {
         job$node_list <- unlist(strsplit(args[12], ",", fixed = TRUE))
         job$file_list <- unlist(strsplit(args[13], ",", fixed = TRUE))
 
+    } else if (args[1] == "--slurm") {
+
+        # args as produced by Lennart Karlsson's script slurm.epilog at the end
+        # of SLURM jobs.
+
+        job$data_type <- "slurm"
+        args <- args[-1]
+
+        # for now act as if it is same as --fji
+        #
+        # jobid cluster jobstate user project jobname endtime runtime flags
+        # coresbooked core_list node_list jobstats_file_list
+        job$jobid <- as.integer(args[1])
+        job$cluster <- if (is.null(job$cluster)) as.character(args[2])
+            else job$cluster
+        job$jobstate <- as.character(args[3])
+        job$user <- as.character(args[4])
+        job$project <- as.character(args[5])
+        job$jobname <- as.character(args[6])
+        job$endtime <- as.character(args[7])
+        job$runtime <- as.character(args[8])
+        job$initial_flag_list <- if (args[idx <- 9] == ".") character(0)
+            else unlist(strsplit(args[idx], ",", fixed = TRUE))
+        job$booked <- if (args[idx <- 10] == ".") NA
+            else as.integer(args[idx])
+        job$core_list <- as.integer(unlist(strsplit(args[11], ",", fixed = TRUE)))
+        job$node_list <- unlist(strsplit(args[12], ",", fixed = TRUE))
+        job$file_list <- unlist(strsplit(args[13], ",", fixed = TRUE))
+
     } else if (args[1] == "--db" || args[1] == "--database") {
 
         # column-wise set of args as produced by Martin Dahlo's sqlite3
