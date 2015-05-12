@@ -17,20 +17,7 @@
 # TODO: is there another, deeper, location for jobstats files we can check?
 # TODO: coordinate with slurm.epilog
 
-    # These are the args passed to plot_jobstats
-    #
-    # unshift @args, $source_R_flags{$o_source};  # --fji or --db, must be just before @_
-    # unshift @args, "--memory" if $o_memory;
-    # unshift @args, "--verbose" if $o_verbose;
-    # unshift @args, "--no-plot" if ! $o_plot;
-    # unshift @args, "--big-plot" if $o_bigplot;
-    #
-    # 0 = jobid, 1 = cluster, 2 = jobstate, 3 = user, 4 = project, 5 = jobname,
-    # 6 = endtime, 7 = runtime, 8 = current flags, 9 = booked (amount booked?),
-    # 10 = core_list number of cores per node, 11 = node_list node name(s),
-    # 12 = file_list jobstats file(s)
-
-my $version = "2015-03-19";
+my $version = "2015-05-12";
 
 use strict;
 use warnings;
