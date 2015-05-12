@@ -13,7 +13,7 @@
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2015-02-24"
+.version <- "2015-05-12"
 .debug <- FALSE
 
 # User options
@@ -28,6 +28,10 @@ flag_severely_overbooked.fraction <- 0.25
 flag_cores_overbooked.fraction <- 0.8
 flag_mem_overbooked.fraction <- 0.25
 flag_core_mem_overbooked.fraction <- 0.5
+
+# In any given time slot, a CPU with a busy percentage below this is counted as
+# unused
+cpu_free <- 1.0
 
 # Allow table output to be very wide
 options(width = 500)
@@ -70,13 +74,13 @@ first.core.column <- 6
 # sizes of available nodes for determining misbooking, sorted in
 # increasing mem size
 node.types <- list(
-    milou          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512), 
+    milou          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
     milou.default  = "mem128GB",
-    kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72), 
-    kalkyl.default = "mem24GB", 
-    tintin         = c(mem64GB = 64, mem128GB = 128), 
+    kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
+    kalkyl.default = "mem24GB",
+    tintin         = c(mem64GB = 64, mem128GB = 128),
     tintin.default = "mem64GB",
-    halvan         = c(halvan = 1024), 
+    halvan         = c(halvan = 1024),
     halvan.default = "halvan")
 
 
@@ -89,23 +93,25 @@ processArgs <- function(args) {
     # peel off the first args, which specify options
     while ( 1 ) {
         switch(args[1],
-            "-n" =, "--no-plot" = { do.plot <<- FALSE; 
-                                    args <- args[-1] },
-            "-v" =, "--verbose" = { do.verbose <<- TRUE; 
-                                    flags.wrap <<- 2; 
-                                    args <- args[-1] },
-            "-m" =, "--memory"  = { do.memory <<- TRUE;
-                                    args <- args[-1] },
-            "-c" =, "--cluster" = { job$cluster <- args[2];
+            "-n" =, "--no-plot" =  { do.plot <<- FALSE;
+                                     args <- args[-1] },
+            "-v" =, "--verbose" =  { do.verbose <<- TRUE;
+                                     flags.wrap <<- 2;
+                                     args <- args[-1] },
+            "-m" =, "--memory"  =  { do.memory <<- TRUE;
+                                     args <- args[-1] },
+            "-c" =, "--cluster" =  { job$cluster <- args[2];
                                     args <- args[-c(1, 2)] },
-            "-b" =, "--big-plot" = { do.big.plot <<- TRUE; 
-                                    args <- args[-1] },
+            "-b" =, "--big-plot" = { do.big.plot <<- TRUE;
+                                     args <- args[-1] },
+            "--cpu-free" =         { cpu_free <- args[2];
+                                     args <- args[-c(1, 2)] },
             break)
     }
 
     # remaining args are either formatted lines (if next arg is --fji or --db)
     # a list of jobstats filenames to read
-    
+
     if (args[1] == "--fji" || args[1] == "--finishedjobinfo") {
 
         # a finishedjobinfo column-wise set of args as produced by the jobstats
@@ -181,9 +187,9 @@ processArgs <- function(args) {
         job$jobname <- as.character(args[6])
         job$endtime <- as.character(args[7])
         job$runtime <- as.character(args[8])
-        job$initial_flag_list <- if (args[idx <- 9] == ".") character(0) 
+        job$initial_flag_list <- if (args[idx <- 9] == ".") character(0)
             else unlist(strsplit(args[idx], ",", fixed = TRUE))
-        job$booked <- if (args[idx <- 10] == ".") NA 
+        job$booked <- if (args[idx <- 10] == ".") NA
             else as.integer(args[idx])
         job$core_list <- as.integer(unlist(strsplit(args[11], ",", fixed = TRUE)))
         job$node_list <- unlist(strsplit(args[12], ",", fixed = TRUE))
@@ -215,7 +221,7 @@ processArgs <- function(args) {
 readJobstatsFile <- function(file, node = "unknown") {
     dat <- read.table(file, header = FALSE, skip = 1)
     num.cores <- ncol(dat) - first.core.column + 1
-    names(dat) <- c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_SWAP_USED", 
+    names(dat) <- c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_SWAP_USED",
         paste0("core", 1:num.cores))
     attr(dat, "file") <- file
     attr(dat, "node") <- node
@@ -228,19 +234,19 @@ readJobstatsFile <- function(file, node = "unknown") {
 # usage patterns that should be flagged
 #
 produceFlags <- function(dat) {
-    
+
     file <- attr(dat, "file")
     node <- attr(dat, "node")
     cluster <- attr(dat, "cluster")
-    
+
     # Determine resources used
 
     num.cores <- ncol(dat) - first.core.column + 1
     core.columns <- first.core.column:ncol(dat)
-    # Here, we could expand to put in a tolerance for determining whether
-    # a core is busy or not
-    core.busy.even_once <- function(.busy_list) sum(.busy_list > 0)
-    cores.busy <- apply(dat[, core.columns, drop = FALSE], 1, 
+    # Here, we use cpu_free as a tolerance for determining whether a core is
+    # busy or not.
+    core.busy.even_once <- function(.busy_list) sum(.busy_list > cpu_free)
+    cores.busy <- apply(dat[, core.columns, drop = FALSE], 1,
                         core.busy.even_once)
     max.cores.busy <- max(cores.busy)
     max.GB.avail <- max(dat$GB_LIMIT)
@@ -258,16 +264,16 @@ produceFlags <- function(dat) {
     flag_cores_overbooked <- FALSE  # some cores never used
     flag_mem_overbooked <- FALSE  # max mem used < booked
     flag_core_mem_overbooked <- FALSE  # max mem used < mem in used cores
-    
+
     if (!cluster %in% names(node.types))
-        write(paste0(cluster, " missing node types, cannot check if ", 
+        write(paste0(cluster, " missing node types, cannot check if ",
                      "node_type_overbooked"), stderr())
     else {
         nt <- node.types[[cluster]]
         node.type.booked <- names(nt)[which(max.GB.avail <= nt)[1]]
         node.type.needed <- names(nt)[which(max.GB.used <= nt)[1]]
         if (!length(node.type.booked) || !length(node.type.needed))
-            write(paste0(cluster, " missing node types, cannot check if ", 
+            write(paste0(cluster, " missing node types, cannot check if ",
                         "node_type_overbooked"), stderr())
         else if (node.type.booked != node.type.needed)
             flag_node_type_overbooked <- TRUE
@@ -276,17 +282,17 @@ produceFlags <- function(dat) {
     fraction.mem.used <- max.GB.used/max.GB.avail
     flag_cores_overbooked <- fraction.cores.used < flag_cores_overbooked.fraction
     flag_mem_overbooked <- num.cores > 1 && fraction.mem.used < flag_mem_overbooked.fraction
-    flag_core_mem_overbooked <- num.cores > 1 && flag_cores_overbooked && 
+    flag_core_mem_overbooked <- num.cores > 1 && flag_cores_overbooked &&
         max.GB.used < (core.mem.used * flag_core_mem_overbooked.fraction)
     max.fraction.used <- max(fraction.cores.used, fraction.mem.used)
     flag_overbooked <- max.fraction.used < flag_overbooked.fraction
     flag_half_overbooked <- max.fraction.used < flag_half_overbooked.fraction
     flag_severely_overbooked <- max.fraction.used < flag_severely_overbooked.fraction
     flag_swap_used <- swap.used
-    
-    include_memory_flag <- do.memory || any(flag_cores_overbooked, flag_half_overbooked, 
+
+    include_memory_flag <- do.memory || any(flag_cores_overbooked, flag_half_overbooked,
         flag_severely_overbooked)
-    
+
     createFlag <- function(avail, used, verbose_msg, msg) {
         if (do.verbose)
             if (is.null(avail)) verbose_msg
@@ -296,59 +302,59 @@ produceFlags <- function(dat) {
     }
 
     flag_list <- character(0)
-    
+
     if (flag_overbooked) {
-        if (do.verbose) 
+        if (do.verbose)
             flag <- paste0("Just ", round(max.fraction.used * 100, 0),
                            "% of booked core and RAM resources were used")
         else flag <- paste0("overbooked:", round(max.fraction.used * 100, 0), "%")
         flag_list <- c(flag_list, flag)
     }
-    
+
     if (flag_half_overbooked)
-        flag_list <- c(flag_list, 
-                       createFlag(NULL, NULL, 
+        flag_list <- c(flag_list,
+                       createFlag(NULL, NULL,
                                   "!! Less than half the booked cores and RAM were used",
                                   "!!half_overbooked"))
-    
+
     if (flag_severely_overbooked)
-        flag_list <- c(flag_list, 
-                       createFlag(NULL, NULL, 
+        flag_list <- c(flag_list,
+                       createFlag(NULL, NULL,
                                   "!! Less than one-quarter the booked cores and RAM were used",
                                   "!!severely_overbooked"))
-    
+
     if (flag_swap_used)
-        flag_list <- c(flag_list, 
-                       createFlag(NULL, NULL, 
+        flag_list <- c(flag_list,
+                       createFlag(NULL, NULL,
                                   "!! Swap space was sued",
                                   "!!swap_used"))
-    
+
     if (flag_node_type_overbooked)
         flag_list <- c(flag_list,
                        createFlag(node.type.booked,
-                                  ifelse(do.verbose, 
+                                  ifelse(do.verbose,
                                          paste("resources of a", node.type.needed, "were"),
                                          node.type.needed),
                                   "node was booked",
                                   "node_type_overbooked"))
-    
+
     if (flag_cores_overbooked)
         flag_list <- c(flag_list,
                        createFlag(num.cores, max.cores.busy,
                                   "cores booked", "cores_overbooked"))
-    
+
     if (flag_mem_overbooked && include_memory_flag)
         flag_list <- c(flag_list,
                        createFlag(max.GB.avail, max.GB.used,
                                   "GB RAM available in booked cores",
                                   "mem_overbooked"))
-    
+
     if (flag_core_mem_overbooked && include_memory_flag)
-        flag_list <- c(flag_list, 
+        flag_list <- c(flag_list,
                        createFlag(core.mem.used, max.GB.used,
-                                  "GB RAM available in used cores", 
+                                  "GB RAM available in used cores",
                                   "core_mem_overbooked"))
-    
+
     return(flag_list)
 }
 
@@ -359,7 +365,7 @@ produceFlags <- function(dat) {
 plotFilename <- function(job) {
     p <- ifelse(job$project == ".", "noproj", job$project)
     u <- ifelse(job$user == ".", "nouser", job$user)
-    paste0(paste(sep = "-", job$cluster, p, u, job$jobid), 
+    paste0(paste(sep = "-", job$cluster, p, u, job$jobid),
         ".png")
 }
 
@@ -368,32 +374,32 @@ plotFilename <- function(job) {
 # Plot a full set of jobstats panels.  Could be just 1
 #
 plotJobstats <- function(job, do.png = TRUE) {
-    
+
     # calculate plot size and layout
     n.panels <- length(job$node_list)
     n.jobstats <- length(names(job$data_list))
-    if (.debug) 
+    if (.debug)
         cat("n.panels =", n.panels, " n.jobstats =", n.jobstats, "\n")
-    
+
     n.columns <- if (n.panels > 1) 2 else 1
     n.rows <- if (n.panels > 1) as.integer(n.panels/2 + 0.5) else 1
-    if (.debug) 
+    if (.debug)
         cat("n.columns =", n.columns, " n.rows =", n.rows, "\n")
     width <- 800
     top.height <- 200
-    panel.height <- switch(as.character(n.panels), 
+    panel.height <- switch(as.character(n.panels),
                            "1" = 500, "2" = 250, n.rows * 250)
     height <- top.height + panel.height
     if (do.big.plot) {
         width <- width * 2
         height <- height * 2
     }
-    if (.debug) 
+    if (.debug)
         cat("width =", width, " height =", height, "\n")
 
-    if (do.png) 
+    if (do.png)
         png(plotFilename(job), width = width, height = height)
-    
+
     opa <- par(no.readonly = TRUE)
     par(mfrow = c(n.rows, n.columns), oma = c(0, 0, top.lines, 0))
     # plot the individual panels for the nodes for which we have data
@@ -411,26 +417,26 @@ plotJobstats <- function(job, do.png = TRUE) {
             text(0.5, 0.5, paste0("Node ", n, " booked but unused"))
         }
     }
-    
+
     # Header lines: top line: jobid jobstate cluster endtime runtime
     txt <- paste(job$jobid, job$jobstate, "on", job$cluster)
-    if (!is.null(job$endtime) && job$endtime != ".") 
+    if (!is.null(job$endtime) && job$endtime != ".")
         txt <- paste(sep = main.sep, txt, paste("end:", job$endtime))
-    if (!is.null(job$runtime) && job$runtime != ".") 
+    if (!is.null(job$runtime) && job$runtime != ".")
         txt <- paste(sep = main.sep, txt, paste("runtime:", job$runtime))
     mtext(txt, font = 2, cex = main.cex, line = main.line, side = 3, outer = TRUE)
-    
+
     if (n.rows > 2) {
         user.line <- user.line - 1
         flags.line <- flags.line - 1
     }
-    
+
     # User, project and jobname lines
-    txt <- paste0("User: ", job$user, "\n", "Proj: ", job$project, "\n", 
+    txt <- paste0("User: ", job$user, "\n", "Proj: ", job$project, "\n",
         "Jobname: ", job$jobname)
-    mtext(txt, font = 2, cex = user.cex, line = user.line, side = 3, adj = user.adj, 
+    mtext(txt, font = 2, cex = user.cex, line = user.line, side = 3, adj = user.adj,
         outer = TRUE)
-    
+
     # Flags in red Flags passed in job$initial_flag_list, flags determined
     # here job$flag_list
     flags.output <- character(0)
@@ -445,21 +451,21 @@ plotJobstats <- function(job, do.png = TRUE) {
         i <- flags.wrap + 1
         while ((i + flags.wrap - 1) <= flags.count) {
             j <- i + flags.wrap - 1
-            flags.output <- paste(sep = flags.line.sep, flags.output, paste(collapse = flags.sep, 
+            flags.output <- paste(sep = flags.line.sep, flags.output, paste(collapse = flags.sep,
                 flags.list[i:j]))
             i <- i + flags.wrap
         }
         if (i <= flags.count) {
-            flags.output <- paste(sep = flags.line.sep, flags.output, paste(collapse = flags.sep, 
+            flags.output <- paste(sep = flags.line.sep, flags.output, paste(collapse = flags.sep,
                 flags.list[i:flags.count]))
         }
     }
     # txt = paste(flags.output)
-    mtext(flags.output, font = 1, cex = flags.cex, line = flags.line, side = 3, 
+    mtext(flags.output, font = 1, cex = flags.cex, line = flags.line, side = 3,
         outer = TRUE, col = flags.col, adj = flags.adj)
     par(opa)
-    
-    if (do.png) 
+
+    if (do.png)
         graphics.off()
 }
 
@@ -468,15 +474,15 @@ plotJobstats <- function(job, do.png = TRUE) {
 # Plot a single jobstats panel
 #
 plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0) {
-    
+
     if (.debug)
         cat('this.row = ', this.row, ' this.col = ', this.col, '\n')
-    
+
     num.cores <- ncol(dat) - first.core.column + 1
     core.columns <- first.core.column:ncol(dat)
-    
+
     # set up plot extents based on resource availability
-    
+
     range.GB <- c(0, dat[1, "GB_LIMIT"])  # GB_LIMIT fixed for job duration
     range.cores <- c(0, num.cores * 100)
     swap.y <- range.GB[2]
@@ -487,7 +493,7 @@ plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0)
     core.labels <- paste0(as.character(core.at), "%")
     core.to.GB <- function(.x) return((.x/range.cores[2]) * range.GB[2])
     core.at <- core.to.GB(core.at)
-    dat$core_ <- core.to.GB(apply(dat[, core.columns, drop = FALSE], 1, 
+    dat$core_ <- core.to.GB(apply(dat[, core.columns, drop = FALSE], 1,
         sum))
     dat$swap_ <- ifelse(dat$GB_SWAP_USED > 0, swap.y, NA)
 
@@ -500,8 +506,8 @@ plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0)
 
     par(mar = c(4, 4, 3, 5.5), las = 1, mgp = c(2.6, 0.5, 0), tcl = -0.4)
 
-    with(dat, plot(x, GB_USED, xlim = range.x, ylim = range.GB, col = col.GB, 
-                   type = "l", lwd = 2, lty = lty.GB, bty = "U", main = node, 
+    with(dat, plot(x, GB_USED, xlim = range.x, ylim = range.GB, col = col.GB,
+                   type = "l", lwd = 2, lty = lty.GB, bty = "U", main = node,
                    cex.main = 1.5, xlab = "", ylab = "", cex.axis = axis.cex))
     mtext(paste0("Wall minutes since job start (5 min resolution, max ", range.x[2], " min)"),
           side = 1, line = axis1.line, las = 0, col = col.GB, cex = axis1.cex)
@@ -511,15 +517,15 @@ plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0)
     axis(4, at = core.at, labels = core.labels, col.axis = col.core, cex.axis = axis.cex)
 
     if (this.col %in% c(0, 2)) # multiplanel axes
-        mtext(paste0("Core busy for ", num.cores, " cores (max ", 
-                     num.cores * 100, "%)"), 
-              side = 4, line = axis2.line, las = 0, col = col.core, 
+        mtext(paste0("Core busy for ", num.cores, " cores (max ",
+                     num.cores * 100, "%)"),
+              side = 4, line = axis2.line, las = 0, col = col.core,
               cex = axis.cex)
 
     # If swap used, plot points and legend
     if (any(!is.na(dat$swap_))) {
         with(dat, points(x, swap_, pch = 16, col = "red"))
-        legend("topleft", legend = "Swap\nused", bty = "n", pch = pch.swap, 
+        legend("topleft", legend = "Swap\nused", bty = "n", pch = pch.swap,
                col = col.swap, text.col = col.swap)
     }
 }
@@ -534,7 +540,7 @@ gatherAllJobstats <- function(job) {
         job$data_list[[node]] <- readJobstatsFile(job$file_list[i], node)
         attr(job$data_list[[node]], "cluster") <- job$cluster
     }
-    job$swap_used <- any(unlist(lapply(job$data_list, function(x) any(x$GB_SWAP_USED > 
+    job$swap_used <- any(unlist(lapply(job$data_list, function(x) any(x$GB_SWAP_USED >
         0))))
     job$flag_list <- produceFlags(job$data_list[[1]])
     return(job)
