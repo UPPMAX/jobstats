@@ -134,6 +134,8 @@ of command line options.
 
 The following command-line options are generally only useful for Uppmax staff.
 
+    --cpu-free FLOAT   Maximum CPU busy percentage for the CPU to count as
+                       free at that sampling time.  Default is 1 %.
     -x directory       Directory prefix to use for jobstats files.  Default is
                        '/sw/share/slurm', and directory structure is 
 
