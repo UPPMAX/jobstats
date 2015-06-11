@@ -42,7 +42,7 @@ my $o_source          = "fji";
 my $o_plot            = 0;  # -p
 my $o_bigplot         = 0;  # -b
 my $o_memory          = 0;  # -m
-my $o_cpufree         = 1.0;  # --cpu-free
+my $o_cpufree         = 3.0;  # --cpu-free
 my $o_project;              # -A
 my $o_nodes;                # -n
 my $o_stdin           = 0;  # -- for finishedjobinfo info on stdin

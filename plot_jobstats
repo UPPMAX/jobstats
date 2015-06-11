@@ -31,7 +31,7 @@ flag_core_mem_overbooked.fraction <- 0.5
 
 # In any given time slot, a CPU with a busy percentage below this is counted as
 # unused
-cpu_free <- 1.0
+cpu_free <- 3.0
 
 # Allow table output to be very wide
 options(width = 500)
