@@ -13,11 +13,13 @@
 # DONE: include more about user, jobstate in plot and table
 # DONE: add -A to call finishedjobinfo with project name
 # DONE: add -b to produce bigger plot with twice the typical dimensions
+# DONE: add text about using mode 2 to produce plot for currently-running job
+# TODO: add option to produce plot for currently-running job (using scontrol show for discovery)
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 # TODO: coordinate with slurm.epilog
 
-my $version = "2015-05-12";
+my $version = "2016-03-24";
 
 use strict;
 use warnings;
@@ -91,13 +93,16 @@ Mode 1:  $NAME -p jobid1 jobid2 jobid3
 Job numbers valid on the cluster.  finishedjobinfo is used to determine further
 information for each job.  This can be rather slow, so if multiple queries are
 expected it would be quicker to run finishedjobinfo yourself separately, see
-Mode 4 below.
+Mode 4 below.  See Mode 2 for a currently running job.
 
 Mode 2:  $NAME -p -n m15,m16 jobid
 -------
 finishedjobinfo is *not* called and Uppmax's stored job statistics files are
 discovered directly.  If you know which node(s) your job ran on or which nodes
 you are interested in, this will be much faster than Mode 1.
+
+NOTE: This mode can also be used for a job that is currently running.  In this
+case, the plot file produced will have the name cluster-noproj-nouser-jobid.png.
 
 Mode 3:  $NAME -p -A project
 -------

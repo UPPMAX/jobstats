@@ -51,6 +51,9 @@ the cluster of interest are discovered directly.  If you know which node(s)
 your job ran on or which nodes you are interested in, this will be much faster
 than Mode 1.
 
+**NOTE: This mode can also be used for a job that is currently running.**  In this
+case, the plot file produced will have the name `cluster-noproj-nouser-jobid.png`.
+
 **Mode 3:**  `jobstats -p -A project`
 
 When providing a project name that is valid for the cluster, `finishedjobinfo`
