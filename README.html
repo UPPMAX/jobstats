@@ -1,6 +1,6 @@
 <h1 id="discovering-job-statistics-with-jobstats">Discovering job statistics with <code>jobstats</code></h1>
 <p>UPPMAX provides <code>jobstats</code> to enable discovery of resource usage for jobs submitted to the SLURM job queue.</p>
-<pre><code>jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
+<pre><code>jobstats  -p [ -r ] [ -M cluster ] [options] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
 <p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced from the jobstats for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the job number, cluster, end time and duration, user, project, job name, and usage flags (more on those below). Plots are saved to the current directory with the name</p>
 <pre><code>cluster-project-user-jobid.png</code></pre>
 <p>An example plot, this was named <code>milou-b2013277-douglas-4535835.png</code>:</p>
@@ -13,7 +13,7 @@
 <p>There are five modes for discovery, depending on what the user provides on the command line: (1) discovery by job number for a completed job; (2) discovery by job number for a currently running job; (3) discovery by node and job number, for a completed or running job; (4) discovery by project; or (5) discovery via information provided on <code>stdin</code>. In of the example command lines below, the <code>-p</code>/<code>--plot</code> option requests that plots of job resource usage are created.</p>
 <p><strong>Mode 1:</strong> <code>jobstats -p jobid1 jobid2 jobid3</code></p>
 <p>The job numbers valid on the cluster. <code>finishedjobinfo</code> is used to determine further information for each job. This can be rather slow, and a message asking for your patience is printed for each job. If multiple queries are expected it would be quicker to run <code>finishedjobinfo</code> yourself separately, see Mode 4 below. See Mode 2 for a currently running job.</p>
-<p><strong>Mode 2:</strong> <code>jobstats -p -r|--running jobid1 jobid2 jobid3</code></p>
+<p><strong>Mode 2:</strong> <code>jobstats -p -r jobid1 jobid2 jobid3</code></p>
 <p>Job numbers of jobs currently running on the cluster. The SLURM <code>squeue</code> tool is used to determine further information for each running job.</p>
 <p><strong>Mode 3:</strong> <code>jobstats -p -n m15,m16 jobid</code></p>
 <p><code>finishedjobinfo</code> is <em>not</em> called and Uppmax's stored job statistics files for the cluster of interest are discovered directly. If you know which node(s) your job ran on or which nodes you are interested in, this will be much faster than Mode 1.</p>
@@ -93,10 +93,10 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
 <ul>
 <li><code>jobid</code> : Job ID</li>
 <li><code>cluster</code> : Cluster on which the job was run</li>
-<li><code>jobstate</code> : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED</li>
+<li><code>jobstate</code> : End status of the job: COMPLETED, RUNNING, FAILED, TIMEOUT, CANCELLED</li>
 <li><code>user</code> : Username that submitted the job</li>
 <li><code>project</code> : Project account under which the job was run</li>
-<li><code>endtime</code> : End time of the job (with <code>-n/--node</code>, this is <code>.</code>)</li>
+<li><code>endtime</code> : End time of the job (with <code>-n/--node</code>, this is <code>.</code>) For running jobs, this is appended with <code>(sched)</code> and surrounded with single quotes.</li>
 <li><code>runtime</code> : Runtime of the job (with <code>-n/--node</code>, this is <code>.</code>)</li>
 <li><code>flags</code> : Flags indicating various types of resource underutilizations</li>
 <li><code>booked</code> : Number of booked cores (with <code>-n/--node</code>, this is <code>.</code>)</li>

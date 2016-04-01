@@ -4,7 +4,7 @@ Discovering job statistics with `jobstats`
 UPPMAX provides `jobstats` to enable discovery of resource usage for jobs submitted
 to the SLURM job queue.
 
-    jobstats  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]
+    jobstats  -p [ -r ] [ -M cluster ] [options] [ jobid [ jobid ... ] | -A project | - ]
 
 With the `-p`/`--plot` option, a plot is produced from the jobstats for each
 jobid.  Plots contain one panel per booked node showing CPU and memory usage,
@@ -176,10 +176,10 @@ Field contents:
 
 * `jobid`    : Job ID
 * `cluster`  : Cluster on which the job was run
-* `jobstate` : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED
+* `jobstate` : End status of the job: COMPLETED, RUNNING, FAILED, TIMEOUT, CANCELLED
 * `user`     : Username that submitted the job
 * `project`  : Project account under which the job was run
-* `endtime`  : End time of the job (with `-n/--node`, this is `.`)
+* `endtime`  : End time of the job (with `-n/--node`, this is `.`)  For running jobs, this is appended with `(sched)` and surrounded with single quotes.
 * `runtime`  : Runtime of the job (with `-n/--node`, this is `.`)
 * `flags`    : Flags indicating various types of resource underutilizations
 * `booked`   : Number of booked cores (with `-n/--node`, this is `.`)

@@ -88,7 +88,7 @@ There are five modes for discovery, depending on what the user provides on the
 command line: (1) discovery by job number for a completed job; (2) discovery by
 job number for a currently running job; (3) discovery by node and job number,
 for a completed or running job; (4) discovery by project; or (5) discovery via
-information provided on 'stdin'.  In of the example command lines below, the
+information provided on 'stdin'.  In each of the example command lines below, the
 -p/--plot option requests that plots of job resource usage are created.
 
 Mode 1:  $NAME -p jobid1 jobid2 jobid3
@@ -217,7 +217,7 @@ Field contents:
 
   jobid    : Job ID
   cluster  : Cluster on which the job was run
-  jobstate : End status of the job: COMPLETED, FAILED, TIMEOUT, CANCELLED
+  jobstate : End status of the job: COMPLETED, RUNNING, FAILED, TIMEOUT, CANCELLED
   user     : Username that submitted the job
   project  : Project account under which the job was run
   endtime  : End time of the job (with -n/--node, this is '.')
