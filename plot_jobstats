@@ -13,7 +13,7 @@
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2015-05-12"
+.version <- "2016-04-01"
 .debug <- FALSE
 
 # User options
@@ -80,7 +80,7 @@ node.types <- list(
     kalkyl.default = "mem24GB",
     tintin         = c(mem64GB = 64, mem128GB = 128),
     tintin.default = "mem64GB",
-    halvan         = c(halvan = 1024),
+    halvan         = c(halvan = 2048),
     halvan.default = "halvan")
 
 
@@ -104,7 +104,7 @@ processArgs <- function(args) {
                                     args <- args[-c(1, 2)] },
             "-b" =, "--big-plot" = { do.big.plot <<- TRUE;
                                      args <- args[-1] },
-            "--cpu-free" =         { cpu_free <- args[2];
+            "--cpu-free" =         { cpu_free <<- as.numeric(args[2]);
                                      args <- args[-c(1, 2)] },
             break)
     }
@@ -112,12 +112,19 @@ processArgs <- function(args) {
     # remaining args are either formatted lines (if next arg is --fji or --db)
     # a list of jobstats filenames to read
 
-    if (args[1] == "--fji" || args[1] == "--finishedjobinfo") {
+    if (args[1] == "--fji" || args[1] == "--finishedjobinfo" || args[1] == "--squeue") {
 
         # a finishedjobinfo column-wise set of args as produced by the jobstats
-        # Perl script
+        # Perl script. If --squeue, it is a currently running job, and we have a
+        # final arg that is run timelimit in minutes
 
-        job$data_type <- "finishedjobinfo"
+        if (args[1] == "--squeue") {
+            job$data_type <- "squeue"
+            job$timelimit_minutes <- as.integer(args[length(args)]) # last arg
+            args <- args[-length(args)]
+        } else {
+            job$data_type <- "finishedjobinfo"
+        }
         args <- args[-1]
 
         # jobid cluster jobstate user project jobname endtime runtime flags
@@ -142,7 +149,7 @@ processArgs <- function(args) {
     } else if (args[1] == "--slurm") {
 
         # args as produced by Lennart Karlsson's script slurm.epilog at the end
-        # of SLURM jobs.
+        # of SLURM jobs.  ** NOT YET IMPLEMENTED **
 
         job$data_type <- "slurm"
         args <- args[-1]
@@ -171,7 +178,7 @@ processArgs <- function(args) {
     } else if (args[1] == "--db" || args[1] == "--database") {
 
         # column-wise set of args as produced by Martin Dahlo's sqlite3
-        # database
+        # database  ** NOT YET IMPLEMENTED **
 
         job$data_type <- "database"
         args <- args[-1]
@@ -407,7 +414,8 @@ plotJobstats <- function(job, do.png = TRUE) {
         this.row <- ifelse(n.panels == 1, 0, as.integer(i/2 + 0.5))
         this.col <- ifelse(n.panels == 1, 0, ifelse(i%%2, 1, 2))
         n <- names(job$data_list)[i]
-        plotJobstatsPanel(job$data_list[[n]], n, this.row, this.col)
+        # if job$timelimit_minutes is not defined it will give NULL
+        plotJobstatsPanel(job$data_list[[n]], n, this.row, this.col, job$timelimit_minutes)
     }
     if (n.panels > n.jobstats) {
         # now plot the individual panels for the unused nodes
@@ -473,7 +481,7 @@ plotJobstats <- function(job, do.png = TRUE) {
 
 # Plot a single jobstats panel
 #
-plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0) {
+plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0, this.timelimit = NULL) {
 
     if (.debug)
         cat('this.row = ', this.row, ' this.col = ', this.col, '\n')
@@ -489,6 +497,7 @@ plotJobstatsPanel <- function(dat, node = "unknown", this.row = 0, this.col = 0)
     # set up traces based on resource usage, 5 minute sampling times
     dat$x <- ((dat$TIME - dat$TIME[1]) / 60) + sampling.plot.offset
     range.x <- c(0, max(ceiling(dat$x + sampling.window - sampling.plot.offset)))
+    if (! is.null(this.timelimit)) range.x[2] = max(range.x[2], this.timelimit)
     core.at <- seq(range.cores[1], range.cores[2], by = 100)
     core.labels <- paste0(as.character(core.at), "%")
     core.to.GB <- function(.x) return((.x/range.cores[2]) * range.GB[2])

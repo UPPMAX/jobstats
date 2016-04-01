@@ -30,11 +30,12 @@ unused'.
 Modes of jobstats discovery
 ===========================
 
-There are four basic modes for discovery, depending on what the user provides
-on the command line: (1) discovery by job number; (2) discovery by node and job
-number; (3) discovery by project; or (4) discovery via information provided on
-`stdin`.  In of the example command lines below, the `-p`/`--plot` option
-requests that plots of job resource usage are created.
+There are five modes for discovery, depending on what the user provides on the
+command line: (1) discovery by job number for a completed job; (2) discovery by
+job number for a currently running job; (3) discovery by node and job number,
+for a completed or running job; (4) discovery by project; or (5) discovery via
+information provided on `stdin`.  In of the example command lines below, the
+`-p`/`--plot` option requests that plots of job resource usage are created.
 
 **Mode 1:**  `jobstats -p jobid1 jobid2 jobid3`
 
@@ -42,31 +43,33 @@ The job numbers valid on the cluster.  `finishedjobinfo` is used to determine
 further information for each job.  This can be rather slow, and a message
 asking for your patience is printed for each job.  If multiple queries are
 expected it would be quicker to run `finishedjobinfo` yourself separately, see
-Mode 4 below.
+Mode 4 below.  See Mode 2 for a currently running job.
 
-**Mode 2:**  `jobstats -p -n m15,m16 jobid`
+**Mode 2:**  `jobstats -p -r jobid1 jobid2 jobid3`
+
+Job numbers of jobs currently running on the cluster.  The SLURM `squeue` tool
+is used to determine further information for each running job.
+
+**Mode 3:**  `jobstats -p -n m15,m16 jobid`
 
 `finishedjobinfo` is *not* called and Uppmax's stored job statistics files for
 the cluster of interest are discovered directly.  If you know which node(s)
 your job ran on or which nodes you are interested in, this will be much faster
 than Mode 1.
 
-**NOTE: This mode can also be used for a job that is currently running.**  In this
-case, the plot file produced will have the name `cluster-noproj-nouser-jobid.png`.
-
-**Mode 3:**  `jobstats -p -A project`
+**Mode 4:**  `jobstats -p -A project`
 
 When providing a project name that is valid for the cluster, `finishedjobinfo`
 is used to determine further information on jobs run within the project.  As
 for Mode 1, this can be rather slow, and a message asking for your patience is
 printed.  Furthermore only `finishedjobinfo` defaults for time span etc. are
 used for job discovery.  If multiple queries are expected or additional
-`finishedjobinfo` options are desired, see Mode 4 below.
+`finishedjobinfo` options are desired, see Mode 5 below.
 
-**Mode 4:**  `finishedjobinfo -q project | jobstats - -p`
+**Mode 5:**  `finishedjobinfo -q project | jobstats - -p`
 
 Accept input on stdin formatted like `finishedjobinfo` output.  Note the single
-dash `-` option given to `jobstats`; the long form of this option is '--stdin'.
+dash `-` option given to `jobstats`; the long form of this option is `--stdin`.
 This mode can be especially useful if multiple queries of the same job
 information are expected.  In this case, save the output of a single
 comprehensive `finishedjobinfo` query, and extract the parts of interest and
@@ -85,6 +88,7 @@ for u in user1 user2 user3 ; do
 done
 ```
 
+
 Command-Line Options
 ====================
 
@@ -92,38 +96,36 @@ Command-Line Options
 of command line options.
 
 ~~~~
-    -M cluster         Cluster on which jobs were run [default current cluster]
+    -p | --plot        Produce CPU and memory usage plot for each jobid
+
+    -r | --running     Jobids are for jobs currently running on the cluster. The
+                       SLURM squeue tool is used to discover further information
+                       for the running jobs, and the rightmost extent of the plot
+                       produced will reflect the scheduled end time of the job.
 
     -A project         Project valid on the cluster.  finishedjobinfo is used to
-                       discover jobs for the project.  See further comments 
-                       under 'Mode 3' above.
+                       discover jobs for the project.  See further comments
+                       under 'Mode 4' above.
+
+    -M cluster         Cluster on which jobs were run [default current cluster]
 
     -n node[,node...]  Cluster node(s) on which the job was run.  If specified,
                        then the finishedjobinfo script is not run and discovery
-                       is restricted to only the specified nodes.  Nodes can be 
-                       specified as a comma-separated list of complete node 
+                       is restricted to only the specified nodes.  Nodes can be
+                       specified as a comma-separated list of complete node
                        names, or using the finishedjobinfo syntax:
                              m78,m90,m91,m92,m100  or  m[78,90-92,100]
                        Nonsensical results will occur if the syntaxes are mixed.
 
-    - | --stdin        Accept input on stdin formatted like finishedjobinfo 
-                       output.  The short form of this option is a single dash 
+    - | --stdin        Accept input on stdin formatted like finishedjobinfo
+                       output.  The short form of this option is a single dash
                        '-'.
-                       
-    -m | --memory      Always include memory usage flags in output.  Default 
-                       behaviour is to include memory usage flags only if CPU 
+
+    -m | --memory      Always include memory usage flags in output.  Default
+                       behaviour is to include memory usage flags only if CPU
                        usage flags are also present.
 
-    -s | --source  fji | db
-                       Source of the input data.  Default is 'fji', the
-                       finishedjobinfo script. 'db' may be used to access a more
-                       rapid but less comprehensive database of job information.
-                       This may also be used with the - flag when sending job
-                       information via stdin.  '-s db' is currently unsupported.
-
     -v | --verbose     Be wordy when describing flag values.
-
-    -p | --plot        Produce CPU and memory usage plot for each jobid
 
     -b | --big-plot    Produce 'big plot' with double the usual dimensions.
                        This implies '-p/--plot'.
@@ -134,22 +136,26 @@ of command line options.
 
     -h | --help | -?   Produce detailed help information
 
+~~~~
+
+
+Additional Options
+=================
 
 The following command-line options are generally only useful for Uppmax staff.
 
     --cpu-free FLOAT   Maximum CPU busy percentage for the CPU to count as
                        free at that sampling time.  Default is 3 %.
     -x directory       Directory prefix to use for jobstats files.  Default is
-                       '/sw/share/slurm', and directory structure is 
+                       '/sw/share/slurm', and directory structure is
 
                        <prefix>/<cluster>/uppmax_jobstats/<node>/<jobid>
 
-    -X directory       Hard directory prefix to use for jobstats files.  
-                       Jobstats files are assumed available directly: 
+    -X directory       Hard directory prefix to use for jobstats files.
+                       Jobstats files are assumed available directly:
                            '<hard-prefix>/<jobid>'
     -f file            finishedjobinfo script
-    -r file            plot_jobstats script
-~~~~
+    -P file            plot_jobstats script
 
 
 Further Details
@@ -180,6 +186,10 @@ Field contents:
 * `cores`    : Number of cores represented in the discovered jobstats files.
 * `node`     : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is `.`.  The nodes for which jobstats files are available are listed first.
 * `jobstats` : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is `.`
+
+If `-r`/`--running` was used, an additional field is present:
+
+* `timelimit_minutes` : The time limit of the job in minutes
 
 At completion of the script, a brief summary is produced:
 
