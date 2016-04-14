@@ -16,11 +16,12 @@
 # DONE: add text about using mode 2 to produce plot for currently-running job
 # DONE: add option to produce plot for running job (using squeue for discovery)
 # DONE: remove documentation of --source option
+# DONE: wrap jobnames in single quotes for output and passing to plot_jobstats
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 # TODO: coordinate with slurm.epilog
 
-my $version = "2016-04-01";
+my $version = "2016-04-15";
 
 use strict;
 use warnings;
@@ -363,6 +364,7 @@ sub parseSqueueLine($) {
     return(0) if ! $keyvals;
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
     $h{end_time} = "'$h{end_time} (sched)'";
+    $h{jobname} = "'$h{jobname}'";
     # calculate timelimit_minutes
     my @tl = split(/[-:]/, $h{timelimit});  # days-hh:mm:ss
     my $timelimit_minutes = 0;
@@ -390,6 +392,7 @@ sub parseFinishedjobinfoLine($) {
     return(0) if (! defined($keyvals));
     # note that null values "... nodes= ..." will result in no key in the hash
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
+    $h{jobname} = "'$h{jobname}'";
     return(\%h);
 }
 
