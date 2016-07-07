@@ -17,6 +17,7 @@
 # DONE: add option to produce plot for running job (using squeue for discovery)
 # DONE: remove documentation of --source option
 # DONE: wrap jobnames in single quotes for output and passing to plot_jobstats
+# TODO: add max mem usage from finishedjobinfo
 # TODO: add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: is there another, deeper, location for jobstats files we can check?
 # TODO: coordinate with slurm.epilog
