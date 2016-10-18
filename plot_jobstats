@@ -76,6 +76,8 @@ first.core.column <- 6
 node.types <- list(
     milou          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
     milou.default  = "mem128GB",
+    irma           = c(mem256GB = 256),
+    irma.default   = "mem256GB",
     kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
     kalkyl.default = "mem24GB",
     tintin         = c(mem64GB = 64, mem128GB = 128),
@@ -129,18 +131,18 @@ processArgs <- function(args) {
 
         # jobid cluster jobstate user project jobname endtime runtime flags
         # coresbooked core_list node_list jobstats_file_list
-        job$jobid <- as.integer(args[1])
-        job$cluster <- if (is.null(job$cluster)) as.character(args[2])
-            else job$cluster
-        job$jobstate <- as.character(args[3])
-        job$user <- as.character(args[4])
-        job$project <- as.character(args[5])
-        job$jobname <- as.character(args[6])
-        job$endtime <- as.character(args[7])
-        job$runtime <- as.character(args[8])
+        job$jobid     <- as.integer(args[1])
+        job$cluster   <- if (is.null(job$cluster)) as.character(args[2])
+                         else job$cluster
+        job$jobstate  <- as.character(args[3])
+        job$user      <- as.character(args[4])
+        job$project   <- as.character(args[5])
+        job$jobname   <- as.character(args[6])
+        job$endtime   <- as.character(args[7])
+        job$runtime   <- as.character(args[8])
         job$initial_flag_list <- if (args[idx <- 9] == ".") character(0)
             else unlist(strsplit(args[idx], ",", fixed = TRUE))
-        job$booked <- if (args[idx <- 10] == ".") NA
+        job$booked    <- if (args[idx <- 10] == ".") NA
             else as.integer(args[idx])
         job$core_list <- as.integer(unlist(strsplit(args[11], ",", fixed = TRUE)))
         job$node_list <- unlist(strsplit(args[12], ",", fixed = TRUE))
@@ -158,18 +160,18 @@ processArgs <- function(args) {
         #
         # jobid cluster jobstate user project jobname endtime runtime flags
         # coresbooked core_list node_list jobstats_file_list
-        job$jobid <- as.integer(args[1])
-        job$cluster <- if (is.null(job$cluster)) as.character(args[2])
-            else job$cluster
-        job$jobstate <- as.character(args[3])
-        job$user <- as.character(args[4])
-        job$project <- as.character(args[5])
-        job$jobname <- as.character(args[6])
-        job$endtime <- as.character(args[7])
-        job$runtime <- as.character(args[8])
+        job$jobid     <- as.integer(args[1])
+        job$cluster   <- if (is.null(job$cluster)) as.character(args[2])
+                         else job$cluster
+        job$jobstate  <- as.character(args[3])
+        job$user      <- as.character(args[4])
+        job$project   <- as.character(args[5])
+        job$jobname   <- as.character(args[6])
+        job$endtime   <- as.character(args[7])
+        job$runtime   <- as.character(args[8])
         job$initial_flag_list <- if (args[idx <- 9] == ".") character(0)
             else unlist(strsplit(args[idx], ",", fixed = TRUE))
-        job$booked <- if (args[idx <- 10] == ".") NA
+        job$booked    <- if (args[idx <- 10] == ".") NA
             else as.integer(args[idx])
         job$core_list <- as.integer(unlist(strsplit(args[11], ",", fixed = TRUE)))
         job$node_list <- unlist(strsplit(args[12], ",", fixed = TRUE))
@@ -185,15 +187,15 @@ processArgs <- function(args) {
 
         # jobid cluster jobstate user project jobname endtime runtime flags
         # coresbooked core_list node_list jobstats_file_list
-        job$jobid <- as.integer(args[1])
-        job$cluster <- if (is.null(job$cluster)) as.character(args[2])
-            else job$cluster
-        job$jobstate <- as.character(args[3])
-        job$user <- as.character(args[4])
-        job$project <- as.character(args[5])
-        job$jobname <- as.character(args[6])
-        job$endtime <- as.character(args[7])
-        job$runtime <- as.character(args[8])
+        job$jobid     <- as.integer(args[1])
+        job$cluster   <- if (is.null(job$cluster)) as.character(args[2])
+                         else job$cluster
+        job$jobstate  <- as.character(args[3])
+        job$user      <- as.character(args[4])
+        job$project   <- as.character(args[5])
+        job$jobname   <- as.character(args[6])
+        job$endtime   <- as.character(args[7])
+        job$runtime   <- as.character(args[8])
         job$initial_flag_list <- if (args[idx <- 9] == ".") character(0)
             else unlist(strsplit(args[idx], ",", fixed = TRUE))
         job$booked <- if (args[idx <- 10] == ".") NA
@@ -207,9 +209,9 @@ processArgs <- function(args) {
         # arguments are a list of jobstats files
 
         job$data_type <- "file"
-        job$cluster <- if (is.null(job$cluster)) "unknown"
-            else job$cluster
-        job$jobid <- basename(args[1])
+        job$cluster   <- if (is.null(job$cluster)) "unknown"
+                         else job$cluster
+        job$jobid     <- basename(args[1])
         job$file_list <- args
         # dummy up a node list
         job$node_list <- job$file_list

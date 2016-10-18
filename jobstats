@@ -17,6 +17,7 @@
 # DONE: add option to produce plot for running job (using squeue for discovery)
 # DONE: remove documentation of --source option
 # DONE: wrap jobnames in single quotes for output and passing to plot_jobstats
+# DONE: for multiple jobs, bundle into a single finishedjobinfo -j
 # TODO: ? add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 # TODO: YES coordinate with slurm.epilog for a -C flag
@@ -32,10 +33,10 @@
 # 2016-09-29 00:31:03 jobid=8702969 jobstate=CANCELLED username=douglas account=staff nodes=m173 procs=16 partition=node qos=normal jobname=Cluster3_LG_1 maxmemory_in_GiB=240.4 maxmemory_node=m173 timelimit=10-00:00:00 submit_time=2016-09-27T14:03:03 start_time=2016-09-27T16:08:49 end_time=2016-09-29T00:31:03 runtime=1-08:22:14 margin=8-15:37:46 queuetime=02:05:46
 # 2016-0
 #
-# TODO: (DONE but not enabled) if a user requests multiple jobs, bundle into a single finishedjobinfo (requires change to finishedjobinfo, request is ticket #136966)
-my $enable_multijobs = 0;
 
-my $version = "2016-10-03";
+my $version = "2016-10-04";
+
+my $enable_multijobs = 1;
 
 use strict;
 use warnings;
@@ -67,7 +68,8 @@ my $o_nodes;                # -n
 my $o_stdin           = 0;  # -- for finishedjobinfo info on stdin
 my $o_header          = 0;  # -d
 my $o_verbose         = 0;  # -v
-my $o_quiet           = 0;  # -q
+my $o_quiet           = 0;  # -q | --quiet
+my $o_Quick           = 0;  # -Q | --Quick to use finishedjobinfo -q
 my $o_finishedjobinfo = "/sw/uppmax/bin/finishedjobinfo"; # -f
 my $o_no_multijobs    = 0;  # --no-multijobs
 my $o_plot_jobstats   = "$CWD/plot_jobstats"; # -P  # default plot_jobstats is in our directory
@@ -133,7 +135,7 @@ Mode 1, this can be rather slow.  Furthermore only finishedjobinfo defaults for
 time span etc. are used for job discovery.  If multiple queries are expected or
 additional finishedjobinfo options are desired, see Mode 5 below.
 
-Mode 5:  finishedjobinfo -q project | $NAME - -p
+Mode 5:  finishedjobinfo project | $NAME - -p
 -------
 Accept input on stdin formatted like finishedjobinfo output.  The long form of
 this option is '--stdin'.  This mode can be especially useful if multiple
@@ -144,7 +146,7 @@ analyses of all completed jobs in a project during the current calendar year,
 and produce separate tarballs analysing all jobs and providing jobstats plots
 for each user during this same period:
 
-     finishedjobinfo -q -y project > proj-year.txt
+     finishedjobinfo -y project > proj-year.txt
      grep 'jobstat=COMPLETED' proj-year.txt | $NAME - > all-completed-jobs.txt
      grep 'username=user1' proj-year.txt | $NAME - -p > user1-jobs.txt
      tar czf user1-jobs.tar.gz user1-jobs.txt *-project-user1-*.png
@@ -191,6 +193,9 @@ COMMAND-LINE OPTIONS
 
     -q | --quiet       Do not produce table output
 
+    -Q | --Quick       Run finishedjobinfo with the -q option, which is slightly
+                       faster but does not include maximum memory used
+
     -d                 Produce a header for table output
 
     -h | --help | -?   Produce detailed help information
@@ -214,7 +219,6 @@ The following command-line options are generally only useful for Uppmax staff.
                            '<hard-prefix>/<jobid>'
     --no-multijobs     Run finishedjobinfo separately for each jobid, rather
                        than once with all jobids bundled into one -j option.
-                       This will be noticably slower.
     -f file            finishedjobinfo script [default is '$o_finishedjobinfo']
     -P file            plot_jobstats script [default is '$o_plot_jobstats']
 
@@ -333,6 +337,7 @@ GetOptions("M=s"          => \$o_cluster,
            "d"            => \$o_header,
            "cpu-free=f"   => \$o_cpufree,
            "quiet"        => \$o_quiet,
+           "Quick"        => \$o_Quick,
            "x=s"          => \$o_prefix,
            "X=s"          => \$o_hardprefix,
            "f=s"          => \$o_finishedjobinfo,
@@ -348,7 +353,7 @@ $o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 ($o_cluster and ($o_stdin or $o_project or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid or -A or --stdin is required.\n***\n$usage";
 
-my $has_multijobs = $enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1;
+my $has_multijobs = ($enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1) ? 1 : 0;
 
 #$o_source = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
 
