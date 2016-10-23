@@ -1,11 +1,12 @@
 <h1 id="discovering-job-statistics-with-jobstats">Discovering job statistics with <code>jobstats</code></h1>
 <p>UPPMAX provides <code>jobstats</code> to enable discovery of resource usage for jobs submitted to the SLURM job queue.</p>
 <pre><code>jobstats  -p [ -r ] [ -M cluster ] [options] [ jobid [ jobid ... ] | -A project | - ]</code></pre>
-<p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced from the jobstats for each jobid. Plots contain one panel per booked node showing CPU and memory usage, and include lines indicating the job number, cluster, end time and duration, user, project, job name, and usage flags (more on those below). Plots are saved to the current directory with the name</p>
+<p>With the <code>-p</code>/<code>--plot</code> option, a plot is produced from the jobstats for each jobid. Plots contain one panel per booked node showing CPU (blue) and memory usage (black) traces and include text lines indicating the job number, cluster, end time and duration, user, project, job name, and usage flags (more on those below). For memory usage, one or two traces are shown: a solid black line shows instantaneous memory usage, and a dotted black line shows overall maximum memory usage if this information is available.</p>
+<p>Plots are saved to the current directory with the name</p>
 <pre><code>cluster-project-user-jobid.png</code></pre>
-<p>An example plot, this was named <code>milou-b2013277-douglas-4535835.png</code>:</p>
+<p>An example plot, this was named <code>milou-b2010042-douglas-8769275.png</code>:</p>
 <div class="figure">
-<img src="milou-b2013277-douglas-4535835.png" /><p class="caption"></p>
+<img src="milou-b2010042-douglas-8769275.png" /><p class="caption"></p>
 </div>
 <p>For multiple-node jobs, plots have a two-column format.</p>
 <p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. In this case the plot will contain a blank panel for each such node together with the message 'node booked but unused'.</p>
@@ -66,6 +67,13 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
 
     -q | --quiet       Do not produce table output
 
+    -Q | --Quick       Run finishedjobinfo with the -q option, which is slightly
+                       faster but does not include SLURM&#39;s record of maximum
+                       memory used. With this option, memory usage analyses can
+                       only rely upon what is reported at 5-minute intervals,
+                       and the trace of maximum memory used (dotted black line)
+                       is not produced.
+
     -d                 Produce a header for table output
 
     -h | --help | -?   Produce detailed help information
@@ -82,6 +90,8 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
 -X directory       Hard directory prefix to use for jobstats files.
                    Jobstats files are assumed available directly:
                        &#39;&lt;hard-prefix&gt;/&lt;jobid&gt;&#39;
+--no-multijobs     Run finishedjobinfo separately for each jobid, rather
+                   than once with all jobids bundled into one -j option
 -f file            finishedjobinfo script
 -P file            plot_jobstats script</code></pre>
 <h1 id="further-details">Further Details</h1>
@@ -100,6 +110,7 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
 <li><code>runtime</code> : Runtime of the job (with <code>-n/--node</code>, this is <code>.</code>)</li>
 <li><code>flags</code> : Flags indicating various types of resource underutilizations</li>
 <li><code>booked</code> : Number of booked cores (with <code>-n/--node</code>, this is <code>.</code>)</li>
+<li><code>maxmem</code> : Maximum meory used as reported by SLURM (if unavailable, this is <code>.</code>)</li>
 <li><code>cores</code> : Number of cores represented in the discovered jobstats files.</li>
 <li><code>node</code> : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is <code>.</code>. The nodes for which jobstats files are available are listed first.</li>
 <li><code>jobstats</code> : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is <code>.</code></li>

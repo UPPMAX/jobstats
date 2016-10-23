@@ -10,9 +10,9 @@ With the `-p`/`--plot` option, a plot is produced from the jobstats for each
 jobid.  Plots contain one panel per booked node showing CPU (blue) and memory
 usage (black) traces and include text lines indicating the job number, cluster,
 end time and duration, user, project, job name, and usage flags (more on those
-below).  For memory usage, one or two traces are shown: the solid black line
-shows instantaneous memory usage, and (if available) the dotted black line
-shows overall maximum memory usage.
+below).  For memory usage, one or two traces are shown: a solid black line
+shows instantaneous memory usage, and a dotted black line shows overall maximum
+memory usage if this information is available.
 
 Plots are saved to the current directory with the name
 
@@ -196,6 +196,7 @@ Field contents:
 * `runtime`  : Runtime of the job (with `-n/--node`, this is `.`)
 * `flags`    : Flags indicating various types of resource underutilizations
 * `booked`   : Number of booked cores (with `-n/--node`, this is `.`)
+* `maxmem`   : Maximum meory used as reported by SLURM (if unavailable, this is `.`)
 * `cores`    : Number of cores represented in the discovered jobstats files.
 * `node`     : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is `.`.  The nodes for which jobstats files are available are listed first.
 * `jobstats` : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is `.`
