@@ -18,25 +18,21 @@
 # DONE: remove documentation of --source option
 # DONE: wrap jobnames in single quotes for output and passing to plot_jobstats
 # DONE: for multiple jobs, bundle into a single finishedjobinfo -j
-# TODO: ? add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
-# TODO: ? is there another, deeper, location for jobstats files we can check?
-# TODO: YES coordinate with slurm.epilog for a -C flag
+# DONE: static max RAM usage from finishedjobinfo, so make its default be to not use '-q'
+# DONE: switch to %fields hash instead of @fields array
+# TODO: complete $o_plot_stdin to enable single call to plot_jobstats with multiple job info fed on stdin
 # TODO: YES implement Martin's efficiency statistic and include in output
 # TODO: YES together with above, provide deeper quantitative information about efficiency on request
-# TODO: YES add max mem usage from finishedjobinfo, which would be invoked without -q... more info too?
+# TODO: YES coordinate with slurm.epilog for a -C flag
 #
-# with -q
-# 2016-09-29 00:11:31 jobid=8702967 jobstate=CANCELLED username=douglas account=staff nodes=m193 procs=16 partition=node jobname=Cluster3_LG_4 timelimit=10-00:00:00 submit_time=2016-09-27T14:02:53 start_time=2016-09-27T15:36:45 end_time=2016-09-29T00:11:31 runtime=1-08:34:46 margin=8-15:25:14 queuetime=01:33:52
-# 2016-09-29 00:31:03 jobid=8702969 jobstate=CANCELLED username=douglas account=staff nodes=m173 procs=16 partition=node jobname=Cluster3_LG_1 timelimit=10-00:00:00 submit_time=2016-09-27T14:03:03 start_time=2016-09-27T16:08:49 end_time=2016-09-29T00:31:03 runtime=1-08:22:14 margin=8-15:37:46 queuetime=02:05:46
-# without -q
-# 2016-09-29 00:11:31 jobid=8702967 jobstate=CANCELLED username=douglas account=staff nodes=m193 procs=16 partition=node qos=normal jobname=Cluster3_LG_4 maxmemory_in_GiB=229.4 maxmemory_node=m193 timelimit=10-00:00:00 submit_time=2016-09-27T14:02:53 start_time=2016-09-27T15:36:45 end_time=2016-09-29T00:11:31 runtime=1-08:34:46 margin=8-15:25:14 queuetime=01:33:52
-# 2016-09-29 00:31:03 jobid=8702969 jobstate=CANCELLED username=douglas account=staff nodes=m173 procs=16 partition=node qos=normal jobname=Cluster3_LG_1 maxmemory_in_GiB=240.4 maxmemory_node=m173 timelimit=10-00:00:00 submit_time=2016-09-27T14:03:03 start_time=2016-09-27T16:08:49 end_time=2016-09-29T00:31:03 runtime=1-08:22:14 margin=8-15:37:46 queuetime=02:05:46
-# 2016-0
+# TODO: ? add usage of Martin's sqlite3 db if it is available (i.e. if we are on milou-b)
+# TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2016-10-04";
+my $version = "2016-10-23";
 
 my $enable_multijobs = 1;
+my $enable_plot_stdin = 0;
 
 use strict;
 use warnings;
@@ -66,6 +62,7 @@ my $o_cpufree         = 3.0;  # --cpu-free
 my $o_project;              # -A
 my $o_nodes;                # -n
 my $o_stdin           = 0;  # -- for finishedjobinfo info on stdin
+my $o_plot_stdin      = 0;  # to send job-specific details to plot_jobstats on its stdin
 my $o_header          = 0;  # -d
 my $o_verbose         = 0;  # -v
 my $o_quiet           = 0;  # -q | --quiet
@@ -87,10 +84,15 @@ Discover jobstats for the specified job(s) on the specified cluster.  Cluster
 defaults to the value of \$SNIC_RESOURCE ('$ENV{'SNIC_RESOURCE'}' on the current system) if
 not specified.
 
-With the -p/--plot option, a plot is produced for each jobid.  Plots contain
-one panel per booked node showing CPU and memory usage, and include lines
-indicating the usage flags.  Plots are saved to the current directory with the
-name
+With the -p/--plot option, a plot is produced from the jobstats for each
+jobid.  Plots contain one panel per booked node showing CPU (blue) and memory
+usage (black) traces and include text lines indicating the job number, cluster,
+end time and duration, user, project, job name, and usage flags (more on those
+below).  For memory usage, one or two traces are shown: the solid black line
+shows instantaneous memory usage, and (if available) the dotted black line
+shows overall maximum memory usage.
+
+Plots are saved to the current directory with the name
 
     cluster-project-user-jobid.png
 
@@ -194,7 +196,11 @@ COMMAND-LINE OPTIONS
     -q | --quiet       Do not produce table output
 
     -Q | --Quick       Run finishedjobinfo with the -q option, which is slightly
-                       faster but does not include maximum memory used
+                       faster but does not include SLURM's record of maximum
+                       memory used. With this option, memory usage analyses can
+                       only rely upon what is reported at 5-minute intervals,
+                       and the trace of maximum memory used (dotted black line)
+                       is not produced.
 
     -d                 Produce a header for table output
 
@@ -218,7 +224,7 @@ The following command-line options are generally only useful for Uppmax staff.
                        Jobstats files are assumed available directly: 
                            '<hard-prefix>/<jobid>'
     --no-multijobs     Run finishedjobinfo separately for each jobid, rather
-                       than once with all jobids bundled into one -j option.
+                       than once with all jobids bundled into one -j option
     -f file            finishedjobinfo script [default is '$o_finishedjobinfo']
     -P file            plot_jobstats script [default is '$o_plot_jobstats']
 
@@ -347,6 +353,9 @@ GetOptions("M=s"          => \$o_cluster,
            "help|?"       => \$o_help) or die "$usage";
 die "$usage$detailed_usage" if $o_help;
 
+die "stdin to plot_jobstats not yet implemented" if $o_plot_stdin or $enable_plot_stdin;
+$o_plot_stdin = 0 if $o_no_multijobs;
+
 $o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 @jobs = @ARGV;
@@ -373,15 +382,22 @@ my $jobcount = 0;
 my $jobcount_notrun = 0;
 my $no_jobstats_file = 0;
 
+# field order in output table
+my @field_order = qw/ jobid cluster jobstate user project jobname endtime runtime flag_list booked maxmem core_list node_list file_list timelimit_minutes /;
+
 sub parseSqueueLine($);
 sub runningJobInfo($);
 sub parseFinishedjobinfoLine($);
+sub fieldNamesInOrder($);
+sub fieldContentsInOrder($);
 sub jobInfo($);
 sub parseNodes($);
 sub getJobstatsFiles($$@);
 sub getJobstatsFileCoreCount($);
 sub reorderNodeList($$);
-sub runPlotJobstats(@);
+sub runPlotJobstats($);
+sub print_JobNotRun($);
+sub print_JobRun($);
 
 # parse a single runningJobInfo-formatted line and return a hash
 sub parseSqueueLine($) {
@@ -406,7 +422,7 @@ sub parseSqueueLine($) {
 sub runningJobInfo($) {
     my $j = shift;
     # nearly identical to finishedjobinfo, by design
-    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j | sed '1d'";  # sed removes 'CLUSTER: cluster' that appears with the -M option
+    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j | sed '1d'";  # sed removes 'CLUSTER: cluster' that appears with the -M option
     return parseSqueueLine(qx($cmd));
 }
 
@@ -419,13 +435,15 @@ sub parseFinishedjobinfoLine($) {
     # note that null values "... nodes= ..." will result in no key in the hash
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
     $h{jobname} = "'$h{jobname}'";
+    $h{maxmemory_in_GiB} = 'not-set' if not exists $h{maxmemory_in_GiB};
+    $h{maxmemory_node} = 'not-set' if not exists $h{maxmemory_node};
     return(\%h);
 }
 
 # discover jobinfo for a single job using finishedjobinfo script
 sub jobInfo($) {
     my $j = shift;
-    my $cmd = "$o_finishedjobinfo -q -M $o_cluster -j $j";
+    my $cmd = "$o_finishedjobinfo".($o_Quick ? " -q" : "")." -M $o_cluster -j $j";
     print STDERR "Running '$cmd' for more information, please be patient...\n";
     return parseFinishedjobinfoLine(qx($cmd));
 }
@@ -492,18 +510,37 @@ sub reorderNodeList($$) {
     return(@new_node_list);
 }
 
-sub runPlotJobstats(@) {
-    my @args = @_;
-    # arguments in @args:
+sub fieldNamesInOrder($) {
+    my $f = shift;
+    return grep {exists $f->{$_}} @field_order;  # removes empty field names when key is undefined
+}
+sub fieldContentsInOrder($) {
+    my $f = shift;
+    return @{$f}{fieldNamesInOrder($f)};
+}
+
+sub runPlotJobstats($) {
+    my $fields = shift;
+    # fields in %$fields
     # 0 = jobid, 1 = cluster, 2 = jobstate, 3 = user, 4 = project, 5 = jobname,
     # 6 = endtime, 7 = runtime, 8 = current flags, 9 = booked (amount booked?),
-    # 10 = core_list number of cores per node, 11 = node_list node name(s),
-    # 12 = file_list jobstats file(s)
+    # 10 = maxmem 11 = core_list number of cores per node, 12 = node_list node name(s),
+    # 13 = file_list jobstats file(s)
     #
     # if this is for a currently-running job ($o_running and $o_source eq "squeue"),
-    # then there is a first pair of arguments:
+    # there is an additional field:
+    # 14 = timelimit_minutes
+    # and maybe a first pair of arguments:
     #     "--timelimit-minutes  INT"
     -f "$o_plot_jobstats" or die "\n***\n*** Script for plotting jobstats '$o_plot_jobstats' not available\n***";
+    my @args;
+    if ($o_plot_stdin) {
+        # plot_jobstats received job-specific info from stdin
+        unshift @args, "--stdin";
+    } else {
+        # plot_jobstats received job-specific info from the argument list
+        unshift @args, fieldContentsInOrder($fields);
+    }
     unshift @args, $source_R_flags{$o_source};  # --fji or --squeue or --db, must be just before @_
     unshift @args, "--cpu-free", $o_cpufree;
     unshift @args, "--memory" if $o_memory;
@@ -521,21 +558,32 @@ sub runPlotJobstats(@) {
 
 sub print_JobNotRun($) {
     my $ji = shift;
-    my @fields = ($ji->{jobid}, $o_cluster, $ji->{jobstate}, $ji->{username}, $ji->{account}, $ji->{jobname}, ".", $ji->{runtime}, "not_run", $ji->{procs}, ".", ".", ".");
-    # this will not be called when $o_running is true
-    print_JobRun(@fields);
+    my %fields = (jobid         => $ji->{jobid},
+                  cluster       => $o_cluster,
+                  jobstate      => $ji->{jobstate},
+                  user          => $ji->{username},
+                  project       => $ji->{account},
+                  jobname       => $ji->{jobname},
+                  endtime       =>  ".",
+                  runtime       =>  $ji->{runtime},
+                  flag_list     => "not_run",
+                  booked        => $ji->{procs},
+                  maxmem        => ".",
+                  core_list     => ".",
+                  node_list     => ".",
+                  jobstats_list => ".");
+    $fields{timelimit_minutes} = "." if $o_running;
+    print_JobRun(\%fields);
 }
 
-my $header = "jobid\tcluster\tjobstate\tuser\tproject\tjobname\tendtime\truntime\tflag_list\tbooked\tcore_list\tnode_list\tjobstats_list";
-$header .= "\ttimelimit_minutes" if $o_running;
-
-sub print_JobRun(@) {
-    my @fields = @_;
-    if ($o_header and not $o_quiet) {  # don't print the header until ready to create output
-        print STDOUT $header, "\n";
+sub print_JobRun($) {
+    my $f = shift;
+    return if $o_quiet;
+    if ($o_header) {  # don't print the header until ready to create output
+        print STDOUT join("\t", fieldNamesInOrder($f)), "\n";
         $o_header = 0;
     }
-    print STDOUT join("\t", @fields), "\n" if not $o_quiet;
+    print STDOUT join("\t", fieldContentsInOrder($f)), "\n";
 }
 
 @nodes = parseNodes($o_nodes) if $o_nodes;
@@ -577,12 +625,14 @@ while ( 1 ) {
     my $endtime = '.';
     my $runtime = '.';
     my $booked = '.';
-    my $timelimit_minutes = '.'; # only used if $o_running
     my $total_cores = 0;
+    my $maxmem = '.'; # will be set if not ($o_Quiet or $o_running)
     my @flag_list;
     my @core_list;
     my @node_list;
     my @file_list,
+    my $timelimit_minutes = '.'; # only used if $o_running
+
     my @jobstats_list;
 
     if (@nodes) {  # -n was used, use this list
@@ -628,6 +678,7 @@ while ( 1 ) {
         $endtime = $ji->{end_time};
         $runtime = $ji->{runtime};
         $booked = $ji->{procs};
+        $maxmem = $ji->{maxmemory_in_GiB} if $ji->{maxmemory_in_GiB} ne 'not-set';
         $timelimit_minutes = $ji->{timelimit_minutes} if $o_running;
     }
     @file_list = getJobstatsFiles($o_cluster, $jobid, @node_list);
@@ -648,31 +699,32 @@ while ( 1 ) {
         }
     }
     # jobid cluster endtime runtime flag-list booked cores node-list jobstats-file-list
-    my @fields;
-    push @fields, $jobid;  # 0
-    push @fields, $o_cluster; # 1
-    push @fields, $jobstate; # 2
-    push @fields, $user; # 3
-    push @fields, $project; # 4
-    push @fields, $jobname; # 5
-    push @fields, $endtime; # 6
-    push @fields, $runtime; # 7
-    push @fields, (@flag_list ? join(",", @flag_list) : "."); my $flags_field = 8; # 8
-    push @fields, $booked; # 9
-    push @fields, (@core_list ? join(",", @core_list) : "."); # 10
-    push @fields, join(",", @node_list); # 11
-    push @fields, (@file_list ? join(",", @file_list) : "."); # 12
-    push @fields, $timelimit_minutes if $o_running;  # 13
+    my %fields;
+    $fields{jobid} = $jobid;
+    $fields{cluster} = $o_cluster;
+    $fields{jobstate} = $jobstate;
+    $fields{user} = $user;
+    $fields{project} = $project;
+    $fields{jobname} = $jobname;
+    $fields{endtime} = $endtime;
+    $fields{runtime} = $runtime;
+    $fields{flag_list} = (@flag_list ? join(",", @flag_list) : ".");
+    $fields{booked} = $booked;
+    $fields{maxmem} = $maxmem;
+    $fields{core_list} = (@core_list ? join(",", @core_list) : ".");
+    $fields{node_list} = join(",", @node_list);
+    $fields{file_list} = (@file_list ? join(",", @file_list) : ".");
+    $fields{timelimit_minutes} = $timelimit_minutes if $o_running;
 
     # if jobstats files, run plot_jobstats R script to check more flags and produce a plot
     if (@file_list) {
 
-        my $pjs_flags = runPlotJobstats(@fields);
+        my $pjs_flags = runPlotJobstats(\%fields);
 
-        $fields[$flags_field] = $pjs_flags if $pjs_flags;
+        $fields{flag_list} = $pjs_flags if $pjs_flags;  # if using %fields
     }
 
-    print_JobRun(@fields);
+    print_JobRun(\%fields);
 
 }
 

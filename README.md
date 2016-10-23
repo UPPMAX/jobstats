@@ -7,16 +7,20 @@ to the SLURM job queue.
     jobstats  -p [ -r ] [ -M cluster ] [options] [ jobid [ jobid ... ] | -A project | - ]
 
 With the `-p`/`--plot` option, a plot is produced from the jobstats for each
-jobid.  Plots contain one panel per booked node showing CPU and memory usage,
-and include lines indicating the job number, cluster, end time and duration,
-user, project, job name, and usage flags (more on those below). Plots are saved
-to the current directory with the name
+jobid.  Plots contain one panel per booked node showing CPU (blue) and memory
+usage (black) traces and include text lines indicating the job number, cluster,
+end time and duration, user, project, job name, and usage flags (more on those
+below).  For memory usage, one or two traces are shown: the solid black line
+shows instantaneous memory usage, and (if available) the dotted black line
+shows overall maximum memory usage.
+
+Plots are saved to the current directory with the name
 
     cluster-project-user-jobid.png
 
-An example plot, this was named `milou-b2013277-douglas-4535835.png`:
+An example plot, this was named `milou-b2010042-douglas-8769275.png`:
 
-![](milou-b2013277-douglas-4535835.png)
+![](milou-b2010042-douglas-8769275.png)
 
 For multiple-node jobs, plots have a two-column format.
 
@@ -132,6 +136,13 @@ of command line options.
 
     -q | --quiet       Do not produce table output
 
+    -Q | --Quick       Run finishedjobinfo with the -q option, which is slightly
+                       faster but does not include SLURM's record of maximum
+                       memory used. With this option, memory usage analyses can
+                       only rely upon what is reported at 5-minute intervals,
+                       and the trace of maximum memory used (dotted black line)
+                       is not produced.
+
     -d                 Produce a header for table output
 
     -h | --help | -?   Produce detailed help information
@@ -154,6 +165,8 @@ The following command-line options are generally only useful for Uppmax staff.
     -X directory       Hard directory prefix to use for jobstats files.
                        Jobstats files are assumed available directly:
                            '<hard-prefix>/<jobid>'
+    --no-multijobs     Run finishedjobinfo separately for each jobid, rather
+                       than once with all jobids bundled into one -j option
     -f file            finishedjobinfo script
     -P file            plot_jobstats script
 

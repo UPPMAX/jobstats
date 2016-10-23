@@ -1,6 +1,7 @@
 TODO
 ====
 
+* Speed up plot production by presenting multiple plot info on stdin to plot_jobstats
 
 
 Completed
