@@ -3,3 +3,5 @@ finishedjobinfo.douglas
 *.png
 *DS_Store
 ._*
+.RData
+.Rhistory
