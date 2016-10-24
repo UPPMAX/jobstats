@@ -196,7 +196,7 @@ Field contents:
 * `runtime`  : Runtime of the job (with `-n/--node`, this is `.`)
 * `flags`    : Flags indicating various types of resource underutilizations
 * `booked`   : Number of booked cores (with `-n/--node`, this is `.`)
-* `maxmem`   : Maximum meory used as reported by SLURM (if unavailable, this is `.`)
+* `maxmem`   : Maximum memory used as reported by SLURM (if unavailable, this is `.`)
 * `cores`    : Number of cores represented in the discovered jobstats files.
 * `node`     : Node(s) booked for the job, expanded into individual node names, separated by commas; if no nodes were found, this is `.`.  The nodes for which jobstats files are available are listed first.
 * `jobstats` : jobstats files for the nodes, in the same order the nodes are listed, separated by commas; if no jobstats files were discovered, this is `.`
