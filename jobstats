@@ -29,7 +29,7 @@
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2016-10-23";
+my $version = "2016-11-15";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -590,12 +590,12 @@ sub print_JobRun($) {
 @nodes = parseNodes($o_nodes) if $o_nodes;
 
 if ($o_project) {
-    my $cmd = "$o_finishedjobinfo -q -M $o_cluster $o_project";
+    my $cmd = "$o_finishedjobinfo".($o_Quick ? " -q" : "")." -M $o_cluster $o_project";
     print STDERR "Running '$cmd' through a pipe to get more information, please be patient...\n";
     open(FJI_PIPE, "$cmd |") or die "could not run $o_finishedjobinfo for project '$o_project': $!";
 } elsif ($has_multijobs) {
     my $j = join(",", @jobs);
-    my $cmd = "$o_finishedjobinfo -q -M $o_cluster -j $j";
+    my $cmd = "$o_finishedjobinfo".($o_Quick ? " -q" : "")." -M $o_cluster -j $j";
     print STDERR "Running '$cmd' through a pipe to get more information, please be patient...\n";
     open(FJI_PIPE, "$cmd |") or die "could not run $o_finishedjobinfo for multiple jobs '$j': $!";
 }
