@@ -1,4 +1,8 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
+
+# use the system perl (#! above) and therefore ignore the PERL5LIB variable
+# from http://computer-programming-forum.com/53-perl/74f89dee1a92c3e3.htm
+no lib split /:/ => $ENV {PERL5LIB};
 
 # Discover Uppmax jobstats files, make preliminary analysis of resource usage,
 # and invoke plot_jobstats for further analysis and plot production.
@@ -29,7 +33,7 @@
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2016-11-15";
+my $version = "2016-12-09";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
