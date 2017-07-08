@@ -33,7 +33,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2016-12-09";
+my $version = "2017-06-13";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -51,9 +51,9 @@ my $NAME = basename($0);
 
 # valid values for --source
 # "fji" for finishedjobinfo, "db" for Martin's database
-my %source_values = ( fji => "fji", finishedjobinfo => "fji", squeue => "squeue", db => "db" );
+my %source_values = ( fji => "fji", finishedjobinfo => "fji", sacct => "sacct", squeue => "squeue", db => "db" );
 # flag passed to $o_plot_jobstats for each source type
-my %source_R_flags = ( fji => "--fji", squeue => "--squeue", db => "--db" );
+my %source_R_flags = ( fji => "--fji", squeue => "--squeue", sacct => "--sacct", db => "--db" );
 
 # options and user values
 my $o_cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
@@ -340,7 +340,7 @@ GetOptions("M=s"          => \$o_cluster,
            "A=s"          => \$o_project,
            ""             => \$o_stdin,
            "stdin"        => \$o_stdin,
-           #"source"       => \$o_source,
+           "source"       => \$o_source,
            "memory"       => \$o_memory,
            "verbose"      => \$o_verbose,
            "plot"         => \$o_plot,
@@ -369,7 +369,7 @@ $o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 my $has_multijobs = ($enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1) ? 1 : 0;
 
-#$o_source = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
+$o_source = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
 
 my $PREFIX = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/uppmax_jobstats" );
 
@@ -546,7 +546,7 @@ sub runPlotJobstats($) {
         # plot_jobstats received job-specific info from the argument list
         unshift @args, fieldContentsInOrder($fields);
     }
-    unshift @args, $source_R_flags{$o_source};  # --fji or --squeue or --db, must be just before @_
+    unshift @args, $source_R_flags{$o_source};  # --fji, --squeue, --sacct or --db, must be just before @_
     unshift @args, "--cpu-free", $o_cpufree;
     unshift @args, "--memory" if $o_memory;
     unshift @args, "--verbose" if $o_verbose;

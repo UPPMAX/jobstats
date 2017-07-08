@@ -27,9 +27,8 @@ For multiple-node jobs, plots have a two-column format.
 Note that not all jobs will produce jobstats files, particularly if the job was
 cancelled or ran for less than 5 minutes.  Also, if a job booked nodes
 inefficiently by not using nodes it asked for, jobstats files will not be
-available for the booked but unused nodes.  In this case the plot will contain
-a blank panel for each such node together with the message 'node booked but
-unused'.
+available for the booked but unused nodes.  For each such node the plot will show
+a blank panel containing the message 'node booked but unused'.
 
 Modes of jobstats discovery
 ===========================
@@ -41,27 +40,27 @@ for a completed or running job; (4) discovery by project; or (5) discovery via
 information provided on `stdin`.  In of the example command lines below, the
 `-p`/`--plot` option requests that plots of job resource usage are created.
 
-**Mode 1:**  `jobstats -p jobid1 jobid2 jobid3`
+**Mode 1, finished jobs, by job ID:**  `jobstats -p jobid1 jobid2 jobid3`
 
-The job numbers valid on the cluster.  `finishedjobinfo` is used to determine
-further information for each job.  This can be rather slow, and a message
-asking for your patience is printed for each job.  If multiple queries are
-expected it would be quicker to run `finishedjobinfo` yourself separately, see
+`finishedjobinfo` is used to determine
+further information for each job.  As this can be rather time-consuming, a message
+is printed asking for your patience.  If multiple queries are
+expected it is more efficient to run `finishedjobinfo` yourself separately; see
 Mode 4 below.  See Mode 2 for a currently running job.
 
-**Mode 2:**  `jobstats -p -r jobid1 jobid2 jobid3`
+**Mode 2, running jobs, by job ID:**  `jobstats -p -r jobid1 jobid2 jobid3`
 
 Job numbers of jobs currently running on the cluster.  The SLURM `squeue` tool
 is used to determine further information for each running job.
 
-**Mode 3:**  `jobstats -p -n m15,m16 jobid`
+**Mode 3, single finished job when nodes are known:**  `jobstats -p -n m15,m16 jobid`
 
 `finishedjobinfo` is *not* called and Uppmax's stored job statistics files for
 the cluster of interest are discovered directly.  If you know which node(s)
 your job ran on or which nodes you are interested in, this will be much faster
 than Mode 1.
 
-**Mode 4:**  `jobstats -p -A project`
+**Mode 4, all available jobs in a project:**  `jobstats -p -A project`
 
 When providing a project name that is valid for the cluster, `finishedjobinfo`
 is used to determine further information on jobs run within the project.  As
@@ -70,7 +69,7 @@ printed.  Furthermore only `finishedjobinfo` defaults for time span etc. are
 used for job discovery.  If multiple queries are expected or additional
 `finishedjobinfo` options are desired, see Mode 5 below.
 
-**Mode 5:**  `finishedjobinfo -q project | jobstats - -p`
+**Mode 5, via stdin:**  `finishedjobinfo -q project | jobstats - -p`
 
 Accept input on stdin formatted like `finishedjobinfo` output.  Note the single
 dash `-` option given to `jobstats`; the long form of this option is `--stdin`.
