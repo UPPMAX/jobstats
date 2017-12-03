@@ -24,7 +24,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # DONE: for multiple jobs, bundle into a single finishedjobinfo -j
 # DONE: static max RAM usage from finishedjobinfo, so make its default be to not use '-q'
 # DONE: switch to %fields hash instead of @fields array
-# TODO: shorter -h help, longer --help help
+# DONE: shorter -h help, longer --help help
 # TODO: complete $o_plot_stdin to enable single call to plot_jobstats with multiple job info fed on stdin
 # TODO: YES implement Martin's efficiency statistic and include in output
 # TODO: YES together with above, provide deeper quantitative information about efficiency on request
