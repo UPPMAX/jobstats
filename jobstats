@@ -24,6 +24,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # DONE: for multiple jobs, bundle into a single finishedjobinfo -j
 # DONE: static max RAM usage from finishedjobinfo, so make its default be to not use '-q'
 # DONE: switch to %fields hash instead of @fields array
+# TODO: shorter -h help, longer --help help
 # TODO: complete $o_plot_stdin to enable single call to plot_jobstats with multiple job info fed on stdin
 # TODO: YES implement Martin's efficiency statistic and include in output
 # TODO: YES together with above, provide deeper quantitative information about efficiency on request
@@ -33,7 +34,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2017-06-13";
+my $version = "2017-12-03";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -76,13 +77,76 @@ my $o_no_multijobs    = 0;  # --no-multijobs
 my $o_plot_jobstats   = "$CWD/plot_jobstats"; # -P  # default plot_jobstats is in our directory
 my $o_prefix          = "/sw/share/slurm"; # -x
 my $o_hardprefix      = ""; # -X
-my $o_help;                 # -h
+my $o_brief_help;           # -h or -?
+my $o_detailed_help;        # --help
 my $o_debug           = 0;  # --debug
 my @nodes;    # after unpacking finishedjobinfo or -n
 my @jobs;     # user-specified jobids
 
-my $usage = "
-$NAME  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]
+my $brief_usage = "
+USAGE
+
+    $NAME  -p [options] [ -M cluster ] [ jobid [ jobid ... ] | -A project | - ]
+
+Discover jobstats for the specified job(s) on the specified cluster (default '$ENV{'SNIC_RESOURCE'}').
+
+Use -p/--plot option to produce a plot for each jobid.  Plots are saved to
+the current directory with the name
+
+    cluster-project-user-jobid.png
+
+Not all jobs will produce jobstats files, particularly if the job was
+cancelled or ran for less than 5 minutes.  Also, if a job booked more nodes
+than it used, jobstats files will not be available for the unused nodes.
+
+See detailed help (--help) for more information.
+
+Jobstats for finished jobs:
+
+    $NAME -p jobid1 jobid2 jobid3
+
+Jobstats for currently running jobs:
+
+    $NAME -p -r jobid1 jobid2 jobid3
+
+Jobstats for a finished job that ran on the specified node(s) (this is fast if you know the node(s)):
+
+    $NAME -p -n m15,m16 jobid
+
+Jobstats for jobs in a specific project:
+
+    $NAME -p -A project
+
+Jobstats for jobs specified on stdin using input formatted like finishedjobinfo output:
+
+    ... | $NAME - -p
+
+
+COMMAND-LINE OPTIONS
+
+    -p | --plot        Produce CPU and memory usage plot for each jobid
+    -r | --running     Jobids are for jobs currently running on the cluster
+    -A project         Project valid on the cluster
+    -M cluster         Cluster on which jobs were run [default is the current cluster]
+    -n node[,node...]  Cluster node(s) on which the job was run
+    -  | --stdin       Accept input on stdin formatted like finishedjobinfo output
+    -m | --memory      Always include memory usage flags in output
+    -v | --verbose     Be wordy when describing flag values
+    -b | --big-plot    Produce 'big plot' with double the usual dimensions
+    -q | --quiet       Do not produce table output
+    -Q | --Quick       Run finishedjobinfo with the -q option, which is faster but
+                       does not include maximum memory used
+    -d                 Produce a header for table output
+    -h | -?            Produce this help
+    --help             Produce detailed help information
+
+";
+
+my $detailed_usage = "
+USAGE
+-----
+
+    $NAME  -p [-r] [-M cluster] [ jobid [ jobid ... ] | -A project | - ] [other options]
 
 Discover jobstats for the specified job(s) on the specified cluster.  Cluster
 defaults to the value of \$SNIC_RESOURCE ('$ENV{'SNIC_RESOURCE'}' on the current system) if
@@ -208,12 +272,9 @@ COMMAND-LINE OPTIONS
 
     -d                 Produce a header for table output
 
-    -h | --help | -?   Produce detailed help information
+    -h | -?            Produce this help
 
-";
-
-my $detailed_usage = "ADDITIONAL OPTIONS
-------------------
+    --help             Produce detailed help information
 
 The following command-line options are generally only useful for Uppmax staff.
 
@@ -231,6 +292,7 @@ The following command-line options are generally only useful for Uppmax staff.
                        than once with all jobids bundled into one -j option
     -f file            finishedjobinfo script [default is '$o_finishedjobinfo']
     -P file            plot_jobstats script [default is '$o_plot_jobstats']
+
 
 FURTHER DETAILS
 ---------------
@@ -269,6 +331,7 @@ Field contents:
 If -r/--running was used, an additional field is present:
 
   timelimit_minutes : The time limit of the job in minutes
+
 
 FLAGS
 -----
@@ -355,8 +418,10 @@ GetOptions("M=s"          => \$o_cluster,
            "P=s"          => \$o_plot_jobstats,
            "debug"        => \$o_debug,
            "no-multijobs" => \$o_no_multijobs,
-           "help|?"       => \$o_help) or die "$usage";
-die "$usage$detailed_usage" if $o_help;
+           "h|?"          => \$o_brief_help,
+           "help"         => \$o_detailed_help) or die "$brief_usage";
+die "$brief_usage" if $o_brief_help;
+die "$detailed_usage" if $o_detailed_help;
 
 die "stdin to plot_jobstats not yet implemented" if $o_plot_stdin or $enable_plot_stdin;
 $o_plot_stdin = 0 if $o_no_multijobs;
@@ -365,7 +430,7 @@ $o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 @jobs = @ARGV;
 
-($o_cluster and ($o_stdin or $o_project or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid or -A or --stdin is required.\n***\n$usage";
+($o_cluster and ($o_stdin or $o_project or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid or -A or --stdin is required.\n***\n$brief_usage";
 
 my $has_multijobs = ($enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1) ? 1 : 0;
 
@@ -375,7 +440,7 @@ my $PREFIX = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/uppmax_jobs
 
 $o_stdin or ($o_running or (-f "$o_finishedjobinfo" or die "\n***\n*** no valid method for discovery (is the finishedjobinfo script '$o_finishedjobinfo' not available?)\n***"));
 
--d "$PREFIX" or die "\n***\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n***\n$usage";
+-d "$PREFIX" or die "\n***\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n***\n$brief_usage";
 
 my $username = scalar getpwuid $<;
 my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
