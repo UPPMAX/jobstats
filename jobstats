@@ -272,7 +272,7 @@ COMMAND-LINE OPTIONS
 
     -d                 Produce a header for table output
 
-    -h | -?            Produce this help
+    -h | -?            Produce brief help
 
     --help             Produce detailed help information
 
