@@ -101,23 +101,23 @@ than it used, jobstats files will not be available for the unused nodes.
 
 See detailed help (--help) for more information.
 
-Jobstats for finished jobs:
+Finished jobs:
 
     $NAME -p jobid1 jobid2 jobid3
 
-Jobstats for currently running jobs:
+Currently running jobs:
 
     $NAME -p -r jobid1 jobid2 jobid3
 
-Jobstats for a finished job that ran on the specified node(s) (this is fast if you know the node(s)):
+Finished job that ran on the specified node(s) (this is fast if you know the node(s)):
 
     $NAME -p -n m15,m16 jobid
 
-Jobstats for jobs in a specific project:
+Jobs in a specific project:
 
     $NAME -p -A project
 
-Jobstats for jobs specified on stdin using input formatted like finishedjobinfo output:
+Jobs specified on stdin using input formatted like finishedjobinfo output:
 
     ... | $NAME - -p
 
