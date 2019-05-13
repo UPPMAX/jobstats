@@ -228,6 +228,12 @@ Flags most likely to represent real overbooking of resources are
 `nodes_overbooked`, `overbooked`, `!!half_overbooked`, `!!severely_overbooked`,
 and `!!swap_used`.
 
+For jobs that require a larger node than the default, for example the `-C mem256GB`
+flag was used while booking the job with SLURM and more than 128GB was actually
+used by the job, then all of the flags pertaining to partial-node booking are
+disabled.  It is not useful to issue such cautions because it is not possible to
+book just a portion of such nodes at UPPMAX.
+
 For multinode jobs, flags other than `nodes_overbooked` are determined based only
 on the usage of the first node.  Multinode jobs require careful analysis so as
 to not waste resources unnecessarily, and it is a common mistake among
