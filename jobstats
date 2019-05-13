@@ -60,9 +60,11 @@ my %source_R_flags = ( fji => "--fji", squeue => "--squeue", sacct => "--sacct",
 my $o_cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
 my $o_running         = 0;  # -r | --running, also sets $o_source to "squeue"
 my $o_source          = "fji";
-my $o_plot            = 0;  # -p
-my $o_bigplot         = 0;  # -b
-my $o_memory          = 0;  # -m
+my $o_plot            = 0;  # -p|--plot
+my $o_bigplot         = 0;  # -b|--bigplot
+my $o_extended        = 1;  # 0 if --no-extended
+my $o_paging          = 0;  # --paging
+my $o_memory          = 0;  # -m|--memory
 my $o_cpufree         = 3.0;  # --cpu-free
 my $o_project;              # -A
 my $o_nodes;                # -n
@@ -136,6 +138,8 @@ COMMAND-LINE OPTIONS
     -q | --quiet       Do not produce table output
     -Q | --Quick       Run finishedjobinfo with the -q option, which is faster but
                        does not include maximum memory used
+    --no-extended      Do *not* use extended jobstats information [default is to use it]
+    --paging           Include PAGE_IN/PAGE_OUT statistics from extended jobstats [experimental]
     -d                 Produce a header for table output
     -h | -?            Produce this help
     --help             Produce detailed help information
@@ -270,6 +274,10 @@ COMMAND-LINE OPTIONS
                        and the trace of maximum memory used (dotted black line)
                        is not produced.
 
+    --no-extended      Do *not* use extended jobstats information [default is to use it]
+
+    --paging           Include PAGE_IN/PAGE_OUT statistics from extended jobstats [experimental]
+
     -d                 Produce a header for table output
 
     -h | -?            Produce brief help
@@ -281,15 +289,17 @@ The following command-line options are generally only useful for Uppmax staff.
     --cpu-free FLOAT   Maximum CPU busy percentage for the CPU to count as
                        free at that sampling time.  Default is $o_cpufree %.
     -x directory       Directory prefix to use for jobstats files.  Default is
-                       '$o_prefix', and directory structure is 
+                       '$o_prefix', and directory structure is (depending on whether
+                       --no-extended is used):
 
+                       <prefix>/<cluster>/extended_uppmax_jobstats/<node>/<jobid>
                        <prefix>/<cluster>/uppmax_jobstats/<node>/<jobid>
 
     -X directory       Hard directory prefix to use for jobstats files.  
                        Jobstats files are assumed available directly: 
                            '<hard-prefix>/<jobid>'
     --no-multijobs     Run finishedjobinfo separately for each jobid, rather
-                       than once with all jobids bundled into one -j option
+                       than all jobids bundled into one -j option (for debugging)
     -f file            finishedjobinfo script [default is '$o_finishedjobinfo']
     -P file            plot_jobstats script [default is '$o_plot_jobstats']
 
@@ -406,12 +416,14 @@ GetOptions("M=s"          => \$o_cluster,
            "source"       => \$o_source,
            "memory"       => \$o_memory,
            "verbose"      => \$o_verbose,
-           "plot"         => \$o_plot,
-           "big-plot"     => \$o_bigplot,
+           "p|plot"       => \$o_plot,
+           "b|big-plot"   => \$o_bigplot,
            "d"            => \$o_header,
            "cpu-free=f"   => \$o_cpufree,
            "quiet"        => \$o_quiet,
            "Quick"        => \$o_Quick,
+           "no-extended"  => sub { $o_extended = 0 },
+           "paging"       => \$o_paging,
            "x=s"          => \$o_prefix,
            "X=s"          => \$o_hardprefix,
            "f=s"          => \$o_finishedjobinfo,
@@ -432,24 +444,25 @@ $o_plot ||= $o_bigplot;  # set $o_plot if $o_bigplot set
 
 ($o_cluster and ($o_stdin or $o_project or scalar(@jobs) >= 1)) or die "\n***\n*** At least one jobid or -A or --stdin is required.\n***\n$brief_usage";
 
-my $has_multijobs = ($enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1) ? 1 : 0;
+my $has_multijobs      = ($enable_multijobs and ! $o_no_multijobs and ! $o_running and scalar(@jobs) > 1) ? 1 : 0;
+$o_source              = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
 
-$o_source = defined($source_values{$o_source}) ? $source_values{$o_source} : die "unrecognised --source value '$o_source'";
+my $PREFIX_extended    = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/extended_uppmax_jobstats" );
+my $PREFIX_no_extended = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/uppmax_jobstats" );
+my $PREFIX             = $o_extended ? $PREFIX_extended : $PREFIX_no_extended;
 
-my $PREFIX = ( $o_hardprefix ? $o_hardprefix : "$o_prefix/$o_cluster/uppmax_jobstats" );
+-d "$PREFIX" or die "\n***\n*** Prefix '$PREFIX/' not a directory.\n***\n$brief_usage";
 
 $o_stdin or ($o_running or (-f "$o_finishedjobinfo" or die "\n***\n*** no valid method for discovery (is the finishedjobinfo script '$o_finishedjobinfo' not available?)\n***"));
 
--d "$PREFIX" or die "\n***\n*** Jobstats directory prefix '$PREFIX/' is not a directory.\n***\n$brief_usage";
+my $username         = scalar getpwuid $<;
+my @user_groups      = map { scalar getgrgid $_ } split ' ', $(;
+my $in_staff         = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
 
-my $username = scalar getpwuid $<;
-my @user_groups = map { scalar getgrgid $_ } split ' ', $(;
-my $in_staff = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
+$o_source            = "squeue" if $o_running;
 
-$o_source = "squeue" if $o_running;
-
-my $jobcount = 0;
-my $jobcount_notrun = 0;
+my $jobcount         = 0;
+my $jobcount_notrun  = 0;
 my $no_jobstats_file = 0;
 
 # field order in output table
@@ -469,8 +482,8 @@ sub runPlotJobstats($);
 sub print_JobNotRun($);
 sub print_JobRun($);
 
-# parse a single runningJobInfo-formatted line and return a hash
 sub parseSqueueLine($) {
+    # parse a single runningJobInfo-formatted line and return a hash
     my $keyvals = shift;
     chomp $keyvals;
     return(0) if ! $keyvals;
@@ -488,16 +501,16 @@ sub parseSqueueLine($) {
     return(\%h);
 }
 
-# discover jobinfo for a single running job using SLURM squeue
 sub runningJobInfo($) {
+    # discover jobinfo for a single running job using SLURM squeue
     my $j = shift;
     # nearly identical to finishedjobinfo, by design
     my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j | sed '1d'";  # sed removes 'CLUSTER: cluster' that appears with the -M option
     return parseSqueueLine(qx($cmd));
 }
 
-# parse a single finishedjobinfo-formatted line and return a hash
 sub parseFinishedjobinfoLine($) {
+    # parse a single finishedjobinfo-formatted line and return a hash
     my $line = shift;
     chomp $line;
     my (undef, undef, $keyvals) = split (/ /, $line, 3);  # removes 'date time ' at start
@@ -510,16 +523,16 @@ sub parseFinishedjobinfoLine($) {
     return(\%h);
 }
 
-# discover jobinfo for a single job using finishedjobinfo script
 sub jobInfo($) {
+    # discover jobinfo for a single job using finishedjobinfo script
     my $j = shift;
     my $cmd = "$o_finishedjobinfo".($o_Quick ? " -q" : "")." -M $o_cluster -j $j";
     print STDERR "Running '$cmd' for more information, please be patient...\n";
     return parseFinishedjobinfoLine(qx($cmd));
 }
 
-# parse list of nodes returned by finishedjobinfo or provided on -n
 sub parseNodes($) {
+    # parse list of nodes returned by finishedjobinfo or provided on -n
     my $nds = shift;
     # nodes=                                # nodes=m80
     # nodes=m[26,74-75,77-78,81-84,88-89]   # nodes=m[100-101,103-104]
@@ -539,8 +552,8 @@ sub parseNodes($) {
     return map { $node_prefix . $_ } @node_nums;
 }
 
-# find jobstats files, if they exist
-sub getJobstatsFiles($$@) {  # cluster jobid node-list
+sub getJobstatsFiles($$@) {
+    # find jobstats files, if they exist
     my $clstr = shift; 
     my $jbid = shift; 
     my @node_list = @_;
@@ -553,20 +566,35 @@ sub getJobstatsFiles($$@) {  # cluster jobid node-list
     return @file_list;
 }
 
-# look in jobstats file for number of cores used
 sub getJobstatsFileCoreCount($) {
+    # look in jobstats file for number of cores used
     my $file = shift;
     open(F, "<$file") or die "***\n*** Could not open jobstats file $file: $!\n***";
     scalar(<F>); # header line
     my $l = <F>; # first data line
-    # first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
     my @f = split /[ \t]+/, $l;
-    return scalar(@f) - 5;
+    my $noncore_cols;
+    if ($o_extended) {
+        # if extended format, first 8 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_MAX_USED, GB_SWAP_USED, PAGE_IN, PAGE_OUT
+        $noncore_cols = 8;
+        # this data line might have a potential runin where GB_SWAP_USED and PAGE_IN run together:
+        #     .... 0.0-7253639 ....
+        # this is now fixed in the system script producing the extended jobstats figures, but there are old files that still have this
+        # formatting error.  there is still the issue of negative PAGE_IN and PAGE_OUT counts which is nonsense.  that too should be
+        # fixed in the system script.
+        if ($f[5] =~ /^(.+)(-.+)$/) { # embedded '-' within column 6
+            @f = ( @f[0..4], $1, $2, @f[6..$#f] );
+        }
+    } else {
+        # if not, first 5 fields are LOCALTIME, TIME, GB_LIMIT, GB_USED, GB_SWAP_USED
+        $noncore_cols = 5;
+    }
+    return scalar(@f) - $noncore_cols;
 }
 
-# reorder node list putting nodes with jobstats files first
 sub reorderNodeList($$) {
-    my $nl = shift; my $fl = shift;
+    # reorder node list putting nodes with jobstats files first
+    my ($nl, $fl) = @_;
     my @old_node_list = @{$nl};
     my @file_list = @{$fl};
     my @new_node_list;
@@ -584,6 +612,7 @@ sub fieldNamesInOrder($) {
     my $f = shift;
     return grep {exists $f->{$_}} @field_order;  # removes empty field names when key is undefined
 }
+
 sub fieldContentsInOrder($) {
     my $f = shift;
     return @{$f}{fieldNamesInOrder($f)};
@@ -613,14 +642,18 @@ sub runPlotJobstats($) {
     }
     unshift @args, $source_R_flags{$o_source};  # --fji, --squeue, --sacct or --db, must be just before @_
     unshift @args, "--cpu-free", $o_cpufree;
+    unshift @args, "--no-extended" if not $o_extended;
+    unshift @args, "--paging" if $o_paging;
     unshift @args, "--memory" if $o_memory;
     unshift @args, "--verbose" if $o_verbose;
-    unshift @args, "--no-plot" if ! $o_plot;
+    unshift @args, "--no-plot" if not $o_plot;
     unshift @args, "--big-plot" if $o_bigplot;
     # all the above come before the passed-in args, if they apply
     print STDERR "$o_plot_jobstats ".join(' ', @args)."\n" if $o_debug;
     print STDERR "this.args = c(\"".join("\",\"", @args)."\")\n" if $o_debug;
-    my $flags = qx($o_plot_jobstats @args);
+
+    my $flags = qx($o_plot_jobstats @args);  # this runs the plot_jobstats command with arguments @args
+
     chomp $flags;
     return($flags);
 
@@ -655,6 +688,9 @@ sub print_JobRun($) {
     }
     print STDOUT join("\t", fieldContentsInOrder($f)), "\n";
 }
+
+
+
 
 @nodes = parseNodes($o_nodes) if $o_nodes;
 
@@ -711,27 +747,28 @@ while ( 1 ) {
         my $ji;
         if ($o_stdin or $o_project or $has_multijobs) {
             $ji = parseFinishedjobinfoLine($input_line);
-            die "***\n*** Jobid cannot be found, inconsistency in stdin input\n***" if ! $ji;
+            die "*** Jobid not found, likely due to some inconsistency in stdin input\n" if ! $ji;
             $jobid = $ji->{jobid};
         } elsif ($o_running) {
             $ji = runningJobInfo($jobid);
             if (! $ji) {  # couldn't find jobinfo, give error and skip to next
-                print STDERR "***\n*** Jobid $jobid cannot be found with squeue, it may not be running\n***\n";
+                print STDERR "*** Jobid $jobid not found, it may not be running?\n";
                 ++$jobcount_notrun;
                 next;
             }
             if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
-                print STDERR "***\n*** Please, do not check other projects (jobid $jobid in $ji->{account})\n***\n";
+                print STDERR "*** $ji->{account} is not one of your projects (jobid $jobid)\n";
                 next;
             }
         } else {
             $ji = jobInfo($jobid);
             if (! $ji) {  # couldn't find jobinfo, give error and skip to next
-                print STDERR "***\n*** Jobid $jobid cannot be found\n***\n";
+                print STDERR "*** Jobid $jobid not found\n";
+                ++$jobcount_notrun;
                 next;
             }
             if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
-                print STDERR "***\n*** Please, do not check other projects (jobid $jobid in $ji->{account})\n***\n";
+                print STDERR "*** $ji->{account} is not one of your projects (jobid $jobid)\n";
                 next;
             }
         }
@@ -740,15 +777,15 @@ while ( 1 ) {
             print_JobNotRun($ji);
             next;
         }
-        @node_list = parseNodes($ji->{nodes});
-        $jobstate = $ji->{jobstate};
-        $user = $ji->{username};
-        $project = $ji->{account}; 
-        $jobname = $ji->{jobname};
-        $endtime = $ji->{end_time};
-        $runtime = $ji->{runtime};
-        $booked = $ji->{procs};
-        $maxmem = $ji->{maxmemory_in_GiB} if $ji->{maxmemory_in_GiB} ne 'not-set';
+        @node_list         = parseNodes($ji->{nodes});
+        $jobstate          = $ji->{jobstate};
+        $user              = $ji->{username};
+        $project           = $ji->{account}; 
+        $jobname           = $ji->{jobname};
+        $endtime           = $ji->{end_time};
+        $runtime           = $ji->{runtime};
+        $booked            = $ji->{procs};
+        $maxmem            = $ji->{maxmemory_in_GiB} if $ji->{maxmemory_in_GiB} ne 'not-set';
         $timelimit_minutes = $ji->{timelimit_minutes} if $o_running;
     }
     @file_list = getJobstatsFiles($o_cluster, $jobid, @node_list);
@@ -770,20 +807,20 @@ while ( 1 ) {
     }
     # jobid cluster endtime runtime flag-list booked cores node-list jobstats-file-list
     my %fields;
-    $fields{jobid} = $jobid;
-    $fields{cluster} = $o_cluster;
-    $fields{jobstate} = $jobstate;
-    $fields{user} = $user;
-    $fields{project} = $project;
-    $fields{jobname} = $jobname;
-    $fields{endtime} = $endtime;
-    $fields{runtime} = $runtime;
-    $fields{flag_list} = (@flag_list ? join(",", @flag_list) : ".");
-    $fields{booked} = $booked;
-    $fields{maxmem} = $maxmem;
-    $fields{core_list} = (@core_list ? join(",", @core_list) : ".");
-    $fields{node_list} = join(",", @node_list);
-    $fields{file_list} = (@file_list ? join(",", @file_list) : ".");
+    $fields{jobid}             = $jobid;
+    $fields{cluster}           = $o_cluster;
+    $fields{jobstate}          = $jobstate;
+    $fields{user}              = $user;
+    $fields{project}           = $project;
+    $fields{jobname}           = $jobname;
+    $fields{endtime}           = $endtime;
+    $fields{runtime}           = $runtime;
+    $fields{flag_list}         = (@flag_list ? join(",", @flag_list) : ".");
+    $fields{booked}            = $booked;
+    $fields{maxmem}            = $maxmem;
+    $fields{core_list}         = (@core_list ? join(",", @core_list) : ".");
+    $fields{node_list}         = join(",", @node_list);
+    $fields{file_list}         = (@file_list ? join(",", @file_list) : ".");
     $fields{timelimit_minutes} = $timelimit_minutes if $o_running;
 
     # if jobstats files, run plot_jobstats R script to check more flags and produce a plot
@@ -791,7 +828,7 @@ while ( 1 ) {
 
         my $pjs_flags = runPlotJobstats(\%fields);
 
-        $fields{flag_list} = $pjs_flags if $pjs_flags;  # if using %fields
+        $fields{flag_list} = $pjs_flags if $pjs_flags;
     }
 
     print_JobRun(\%fields);
@@ -799,13 +836,19 @@ while ( 1 ) {
 }
 
 if (not $o_quiet) {
-    print STDERR "*** $jobcount total jobs, ".
-                 "$jobcount_notrun jobs not ".($o_running ? "running" : "run").", ".
-                 "$no_jobstats_file jobs had no jobstats files (includes jobs not ".($o_running ? "running" : "run").")\n";
+    print STDERR "*** $jobcount total jobs\n";
+    print STDERR "*** ".($jobcount - $jobcount_notrun)." jobs ".($o_running ? "running" : "run");
+    print STDERR ", $jobcount_notrun jobs not ".($o_running ? "running" : "run")."\n";
+    if ($no_jobstats_file) {
+        print STDERR "*** No jobstats files for $no_jobstats_file ".($o_running ? "running" : "run")." jobs";
+        print STDERR " and thus no plot produced" if $o_plot;
+        print STDERR "\n";
+    }
 }
 if ($no_jobstats_file and $o_quiet) {
-    print STDERR "*** No jobstats files found for $no_jobstats_file out of $jobcount jobs, limited resource usage diagnosis";
-    print STDERR " and no plot produced" if $o_plot;
+    print STDERR "*** $jobcount jobs; ".($jobcount - $jobcount_notrun)." jobs run, $jobcount_notrun jobs not run"; 
+    print STDERR "*** No jobstats files for $no_jobstats_file ".($o_running ? "running" : "run")." jobs";
+    print STDERR " and thus no plot produced" if $o_plot;
     print STDERR "\n";
 }
 

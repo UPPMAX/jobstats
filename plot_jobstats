@@ -7,14 +7,14 @@
 #
 # DONE: add 'static' maxmem
 # TODO: implement receiving job info on stdin with --stdin 
-# TODO: add node-specific maxmem traces when they are available in jobstats files
+# TODO: handle extended jobstats
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
 # TODO: set limits below using arguments
 # TODO: better documentation
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2016-10-23"
+.version <- "2018-09-07"
 .debug <- FALSE
 
 .enable_stdin <- FALSE
@@ -22,6 +22,8 @@
 # User options
 do.flags <- TRUE  # print list of flags to stdout
 do.memory <- FALSE  # include flags for memory-caution-only jobs
+do.extended <- TRUE  # the jobstats file is the extended version
+do.paging <- FALSE  # include PAGE_IN/PAGE_OUT information from extended jobstats
 do.verbose <- FALSE  # produce verbose instead of terse flags
 
 # When to produce flags, for more see produceFlags()
@@ -36,8 +38,8 @@ flag_core_mem_overbooked.fraction <- 0.5
 # unused
 cpu_free <- 3.0
 
-# Allow table output to be very wide
-options(width = 500)
+# Allow table output to be very wide, and don't convert strings to factors
+options(width = 500, stringsAsFactors = FALSE)
 
 # Basic plot options
 do.plot <- TRUE  # produce the plot
@@ -50,11 +52,15 @@ lwd.GB <- 2  # memory lines
 col.core <- "blue"
 lty.core <- 2  # core usage lines
 lwd.core <- 2  # core usage lines
-col.maxmem <- "black"
-lty.maxmem <- 3  # for maxmem
-lwd.maxmem <- 1  # for maxmem
-col.swap <- "red"
-pch.swap <- 16  # if swap was used
+maxmem.col <- "black"
+maxmem.lty <- 3  # for maxmem
+maxmem.lwd <- 1  # for maxmem
+paging.col <- "green4"
+paging.cex <- 0.8
+paging.in.pch <- 2
+paging.out.pch <- 6
+swap.col <- "red"
+swap.pch <- 16  # if swap was used
 top.lines <- 9  # lines to leave at the top of the plot
 main.line <- top.lines - 2  # main. options control the title
 main.cex <- 1.7
@@ -73,27 +79,37 @@ flags.wrap <- 3
 flags.col <- "red3"
 flags.cex <- 1.2
 flags.adj <- 0.98
+pagein.pch <- 2
+pagein.cex <- 1.2
+pagein.col <- "green4"
+pageout.pch <- 6
+pageout.cex <- 1.2
+pageout.col <- "coral3"
 
 # When are data sampled, used for producing plots
 sampling.plot.offset <- 2.5
 sampling.window <- 5
 
 # first column in jobstats file for core usage
-first.core.column <- 6
+first.core.column <- 9  # for extended jobstats; 6 for --no-extended
 
 # sizes of available nodes for determining misbooking, sorted in
 # increasing mem size
 node.types <- list(
-    milou          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
-    milou.default  = "mem128GB",
-    irma           = c(mem256GB = 256),
-    irma.default   = "mem256GB",
-    kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
-    kalkyl.default = "mem24GB",
-    tintin         = c(mem64GB = 64, mem128GB = 128),
-    tintin.default = "mem64GB",
-    halvan         = c(halvan = 2048),
-    halvan.default = "halvan")
+    rackham         = c(mem128GB = 128, mem256GB = 256, mem1TB = 1024),
+    rackham.default = "mem128GB",
+    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    snowy.default   = "mem128GB",
+    milou           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    milou.default   = "mem128GB",
+    irma            = c(mem256GB = 256),
+    irma.default    = "mem256GB",
+    kalkyl          = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
+    kalkyl.default  = "mem24GB",
+    tintin          = c(mem64GB = 64, mem128GB = 128),
+    tintin.default  = "mem64GB",
+    halvan          = c(halvan = 2048),
+    halvan.default  = "halvan")
 
 
 
@@ -111,6 +127,11 @@ processArgs <- function(args) {
                                      flags.wrap  <<- 2;
                                      args         <- args[-1] },
             "-m" =, "--memory"  =  { do.memory   <<- TRUE;
+                                     args         <- args[-1] },
+            "--no-extended"     =  { do.extended  <<- FALSE;
+                                     first.core.column <<- 6; # within jobstats file
+                                     args         <- args[-1] },
+            "--paging"          =  { do.paging   <<- TRUE;
                                      args         <- args[-1] },
             "-c" =, "--cluster" =  { job$cluster  <- args[2];
                                     args          <- args[-c(1, 2)] },
@@ -247,11 +268,46 @@ processArgs <- function(args) {
 
 # read jobstats file and fill in data.frame attributes
 #
-readJobstatsFile <- function(file, node = "unknown") {
-    dat <- read.table(file, header = FALSE, skip = 1)
-    num.cores <- ncol(dat) - first.core.column + 1
-    names(dat) <- c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_SWAP_USED",
-        paste0("core", 1:num.cores))
+readJobstatsFile <- function(file, node = "unknown", ncores = NA) {
+    if (! do.extended) {  # not using extended jobstats file
+        dat <- read.table(file, header = FALSE, skip = 1)
+        num.cores <- ncol(dat) - first.core.column + 1
+        if (!is.na(ncores) && num.cores != ncores)
+            write(paste0("inconsistent core counts: ", ncores, " from jobstats and ", num.cores, " from jobstats file"),
+                  stderr())
+        names(dat) <- c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_SWAP_USED",
+            paste0("core", 1:num.cores))
+    } else {  # using extended jobstats file
+        dat <-read.table(file, header = FALSE, fill = TRUE, skip = 1)
+        num.cores <- ncol(dat) - first.core.column + 1
+        # look for formatting bug, where col 6 and 7 are jammed together.  correct for all lines, or some lines
+        split.field <- function(.x) {
+            e <- sub("^(.+)(-.+)$", "\\1\t\\2", .x, perl=TRUE)
+            f <- strsplit(e, "\t", perl=TRUE)
+            if (! is.list(f)) f = list(f)
+            g <- do.call(rbind, f)
+            return(g)
+        }
+        if (!is.na(ncores) && num.cores != ncores) {  # this may happen if all lines include merged columns
+            dat <- cbind(dat[,1:5], split.field(dat[,6]), dat[,7:ncol(dat)])
+        } else {
+            rows.to.split <- is.na(dat[,ncol(dat)])
+            if (sum(rows.to.split) > 0) {
+                dat.to.split <- dat[rows.to.split, , drop=FALSE]
+                #write(paste0(sum(rows.to.split), " rows to split"), stderr())
+                new67 <- split.field(dat.to.split[, 6, drop=FALSE])
+                dat.to.split <- cbind(dat.to.split[,1:5], new67, dat.to.split[, 7:(ncol(dat.to.split) - 1), drop=FALSE])
+                dat[rows.to.split, ] <- dat.to.split
+            }
+        }
+        names(dat) <- c("LOCALTIME", "TIME", "GB_LIMIT", "GB_USED", "GB_MAX_USED",
+            "GB_SWAP_USED", "PAGE_IN", "PAGE_OUT", 
+            paste0("core", 1:num.cores))
+        for (col in c("GB_MAX_USED", "GB_SWAP_USED", "PAGE_IN", "PAGE_OUT")) dat[[col]] <- as.numeric(dat[[col]])
+        dat$GB_MAX_USED <- sapply(1:nrow(dat), function(.x) max(dat$GB_MAX_USED[1:.x])) # rolling max
+        dat$PAGE_IN[dat$PAGE_IN < 0] <- 0  # where PAGE_IN or PAGE_OUT are not valid, set them to 0
+        dat$PAGE_OUT[dat$PAGE_OUT < 0] <- 0
+    }
     attr(dat, "file") <- file
     attr(dat, "node") <- node
     return(dat)
@@ -261,6 +317,8 @@ readJobstatsFile <- function(file, node = "unknown") {
 
 # Look at jobstats data.frame (with attributes) to see if there are
 # usage patterns that should be flagged
+#
+# No clue what aspects of PAGE_IN/PAGE_OUT should be highlighted
 #
 produceFlags <- function(job) {
     dat <- job$data_list[[1]]
@@ -281,7 +339,7 @@ produceFlags <- function(job) {
     max.cores.busy <- max(cores.busy)
     max.GB.avail <- max(dat$GB_LIMIT)
     if (is.null(job$maxmem) || is.na(job$maxmem) || job$maxmem == '.')  # if we don't have independent maxmem info
-        job$maxmem = max(dat$GB_USED)
+        job$maxmem = if (do.extended) max(dat$GB_MAX_USED) else max(dat$GB_USED)
     max.GB.used <- job$maxmem
     swap.used <- any(dat$GB_SWAP_USED > 0)
     core.GB <- max.GB.avail/num.cores
@@ -359,7 +417,7 @@ produceFlags <- function(job) {
     if (flag_swap_used)
         flag_list <- c(flag_list,
                        createFlag(NULL, NULL,
-                                  "!! Swap space was sued",
+                                  "!! Swap space was used",
                                   "!!swap_used"))
 
     if (flag_node_type_overbooked)
@@ -537,8 +595,7 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
     core.labels <- paste0(as.character(core.at), "%")
     core.to.GB <- function(.x) return((.x/range.cores[2]) * range.GB[2])
     core.at <- core.to.GB(core.at)
-    dat$core_ <- core.to.GB(apply(dat[, core.columns, drop = FALSE], 1,
-        sum))
+    dat$core_ <- core.to.GB(apply(dat[, core.columns, drop = FALSE], 1, sum))
     dat$swap_ <- ifelse(dat$GB_SWAP_USED > 0, swap.y, NA)
 
     # if just one entry, then give it some body by doubling it to make a line
@@ -554,11 +611,32 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
                    type = "l", lwd = lwd.GB, lty = lty.GB, bty = "U",
                    main = node, xlab = "", ylab = ""))
                    #cex.main = 1.5, xlab = "", ylab = "", cex.axis = axis.cex))
-    if (! is.null(this.maxmem)) {
-        # when it is a single value
-        abline(h = this.maxmem, col = col.maxmem, lwd = lwd.maxmem, lty = lty.maxmem)
-        #  when it is a trace
-        #with(dat, lines(x, this.maxmem, col = col.maxmem, lwd = lwd.maxmem, lty = lty.maxmem))
+    if (do.extended) { # trace
+        with(dat, lines(x, GB_MAX_USED, col = maxmem.col, lwd = maxmem.lwd, lty = maxmem.lty))
+        if (do.paging) { # now PAGE_IN/PAGE_OUT
+            range.page <- c(0, dat$PAGE_IN, dat$PAGE_OUT)
+            if (range.page[2] != 0) {
+                paging.to.GB <- function(.x) return((.x/range.page[2]) * range.GB[2])
+                dat$pagein_ <- paging.to.GB(dat$PAGE_IN); dat$pagein_[dat$pagein_ == 0] <- NA
+                dat$pageout_ <- paging.to.GB(dat$PAGE_OUT); dat$pageout_[dat$pageout_ == 0] <- NA
+                with(dat, points(x, pagein_, col = paging.col, cex = paging.cex, pch = paging.in.pch))
+                with(dat, points(x, pageout_, col = paging.col, cex = paging.cex, pch = paging.out.pch))
+                # add annotation to the highest and lowest paging points
+                annotate.page.max <- function(x, page, PAGE) {
+                    nm = deparse(substitute(PAGE))
+                    if (any(! is.na(page))) {
+                        mx = max(PAGE)
+                        idx = which(PAGE == mx)[1]
+                        write(paste0("maximum ", nm, " is ", mx, " at position ", idx), stderr())
+                        text(x=x[i], y=page[i], labels=PAGE[i], pos=3, col=paging.col, cex=paging.cex)
+                    }
+                }
+                with(dat, annotate.page.max(x, pagein_, PAGE_IN))
+                with(dat, annotate.page.max(x, pageout_, PAGE_OUT))
+            }
+        }
+    } else if (! is.null(this.maxmem)) {
+        abline(h = this.maxmem, col = maxmem.col, lwd = maxmem.lwd, lty = maxmem.lty)
     }
     mtext(paste0("Wall minutes since job start (5 min resolution, max ", range.x[2], " min)"),
           side = 1, line = axis1.line, las = 0, col = col.GB, cex = axis1.cex)
@@ -575,9 +653,9 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
 
     # If swap used, plot points and legend
     if (any(!is.na(dat$swap_))) {
-        with(dat, points(x, swap_, pch = 16, col = "red"))
-        legend("topleft", legend = "Swap\nused", bty = "n", pch = pch.swap,
-               col = col.swap, text.col = col.swap)
+        with(dat, points(x, swap_, pch = swap.pch, col = swap.col))
+        legend("topleft", legend = "Swap\nused", bty = "n", pch = swap.pch,
+               col = swap.col, text.col = swap.col)
     }
 }
 
@@ -588,7 +666,7 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
 gatherAllJobstats <- function(job) {
     for (i in 1:length(job$file_list)) {
         node <- job$node_list[i]
-        job$data_list[[node]] <- readJobstatsFile(job$file_list[i], node)
+        job$data_list[[node]] <- readJobstatsFile(job$file_list[i], node, job$core_list[i])
         attr(job$data_list[[node]], "cluster") <- job$cluster
     }
     job$swap_used <- any(unlist(lapply(job$data_list, function(x) any(x$GB_SWAP_USED >
@@ -603,6 +681,9 @@ gatherAllJobstats <- function(job) {
 #
 args <- commandArgs(trailingOnly = TRUE)
 
+#args2 <- c("--cpu-free", "3", "--fji", "516782", "rackham", ".", ".", ".", ".", ".", ".", ".", ".", ".", "20", "r97", "/sw/share/slurm/rackham/extended_uppmax_jobstats/r97/516782")
+#args = args2
+
 if (.debug) { cat("after commandArgs()\n"); print(args) }
 
 if (.debug && exists('this.args')) args <- this.args
@@ -610,6 +691,11 @@ if (.debug && exists('this.args')) args <- this.args
 job <- processArgs(args)
 
 if (.debug) { cat("after processArgs()\n"); print(job) }
+
+#debug(gatherAllJobstats)
+#debug(readJobstatsFile)
+#debug(plotJobstats)
+#browser()
 
 job <- gatherAllJobstats(job)
 
