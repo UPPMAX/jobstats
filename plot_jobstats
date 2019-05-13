@@ -84,16 +84,20 @@ first.core.column <- 6
 # sizes of available nodes for determining misbooking, sorted in
 # increasing mem size
 node.types <- list(
-    milou          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
-    milou.default  = "mem128GB",
-    irma           = c(mem256GB = 256),
-    irma.default   = "mem256GB",
-    kalkyl         = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
-    kalkyl.default = "mem24GB",
-    tintin         = c(mem64GB = 64, mem128GB = 128),
-    tintin.default = "mem64GB",
-    halvan         = c(halvan = 2048),
-    halvan.default = "halvan")
+    milou           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    milou.default   = "mem128GB",
+    irma            = c(mem256GB = 256),
+    irma.default    = "mem256GB",
+    kalkyl          = c(mem24GB = 24, mem48GB = 48, mem72GB = 72),
+    kalkyl.default  = "mem24GB",
+    tintin          = c(mem64GB = 64, mem128GB = 128),
+    tintin.default  = "mem64GB",
+    rackham         = c(mem128GB = 128, mem256GB = 256, mem1TB = 1024),
+    rackham.default = "mem128GB",
+    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    snowy.default   = "mem128GB",
+    halvan          = c(halvan = 2048),
+    halvan.default  = "halvan")
 
 
 
@@ -302,6 +306,7 @@ produceFlags <- function(job) {
                      "node_type_overbooked"), stderr())
     else {
         nt <- node.types[[cluster]]
+        nt.default <- node.types[[paste0(cluster, ".default")]]
         # TODO: retrieve node.type.booked from sacct or squeue
         node.type.booked <- names(nt)[which(max.GB.avail <= nt)[1]]
         node.type.needed <- names(nt)[which(max.GB.used <= nt)[1]]
@@ -322,6 +327,17 @@ produceFlags <- function(job) {
     flag_half_overbooked <- max.fraction.used < flag_half_overbooked.fraction
     flag_severely_overbooked <- max.fraction.used < flag_severely_overbooked.fraction
     flag_swap_used <- swap.used
+
+    # Unset all the sub-node flags if node.type.needed is bigger than the default node type.
+    # These flags are not selectable for anything bigger than the default node
+    if (node.type.needed != nt.default) {
+        flag_cores_overbooked <- FALSE
+        flag_mem_overbooked <- FALSE
+        flag_core_mem_overbooked <- FALSE
+        flag_overbooked <- FALSE
+        flag_half_overbooked <- FALSE
+        flag_severely_overbooked <- FALSE
+    }
 
     include_memory_flag <- do.memory || any(flag_cores_overbooked, flag_half_overbooked,
         flag_severely_overbooked)
