@@ -108,6 +108,8 @@ node.types <- list(
     rackham.default = "mem128GB",
     snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
     snowy.default   = "mem128GB",
+    bianca          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    bianca.default  = "mem128GB",
     halvan          = c(halvan = 2048),
     halvan.default  = "halvan")
 
