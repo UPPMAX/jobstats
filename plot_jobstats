@@ -6,6 +6,7 @@
 # Latest is available at https://github.com/douglasgscofield/uppmax
 #
 # DONE: add 'static' maxmem
+# DONE: added bianca info
 # TODO: implement receiving job info on stdin with --stdin 
 # TODO: handle extended jobstats
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
@@ -14,7 +15,7 @@
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2019-05-13"
+.version <- "2020-11-30"
 .debug <- FALSE
 
 .enable_stdin <- FALSE
