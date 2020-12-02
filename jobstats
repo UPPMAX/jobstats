@@ -465,6 +465,10 @@ my $jobcount         = 0;
 my $jobcount_notrun  = 0;
 my $no_jobstats_file = 0;
 
+
+#print STDERR "****EXTENDED $o_extended   PREFIX $PREFIX\n";
+
+
 # field order in output table
 my @field_order = qw/ jobid cluster jobstate user project jobname endtime runtime flag_list booked maxmem core_list node_list file_list timelimit_minutes /;
 
