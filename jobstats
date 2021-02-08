@@ -284,7 +284,7 @@ COMMAND-LINE OPTIONS
 
     --help             Produce detailed help information
 
-The following command-line options are generally only useful for Uppmax staff.
+The following command-line options are generally useful only for Uppmax staff.
 
     --cpu-free FLOAT   Maximum CPU busy percentage for the CPU to count as
                        free at that sampling time.  Default is $o_cpufree %.
