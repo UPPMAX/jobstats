@@ -34,13 +34,14 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2017-12-03";
+my $version = "2021-02-08";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
 
 use strict;
 use warnings;
+use feature 'say';
 # use diagnostics;
 
 use Getopt::Long qw(:config no_ignore_case);
@@ -455,9 +456,18 @@ my $PREFIX             = $o_extended ? $PREFIX_extended : $PREFIX_no_extended;
 
 $o_stdin or ($o_running or (-f "$o_finishedjobinfo" or die "\n***\n*** no valid method for discovery (is the finishedjobinfo script '$o_finishedjobinfo' not available?)\n***"));
 
-my $username         = scalar getpwuid $<;
-my @user_groups      = map { scalar getgrgid $_ } split ' ', $(;
-my $in_staff         = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
+# get user IDs
+my $username           = scalar getpwuid $<;
+my @user_groups        = map { scalar getgrgid $_ } split ' ', $(;
+my @user_slurm_groups  = qx/sacctmgr -n list assoc where user=$username format=account -P | sort -Vu | grep -v no_project/;
+chomp @user_slurm_groups;
+my $in_staff           = (scalar(grep /^staff$/, @user_groups) or ($username eq "root"));
+if ($o_debug) {
+    say STDERR "User IDs:  username=$username";
+    say STDERR "           user_groups=".join(',', @user_groups);
+    say STDERR "           user_slurm_groups=".join(',', @user_slurm_groups);
+    say STDERR "           in_staff=$in_staff";
+}
 
 $o_source            = "squeue" if $o_running;
 
@@ -472,6 +482,7 @@ my $no_jobstats_file = 0;
 # field order in output table
 my @field_order = qw/ jobid cluster jobstate user project jobname endtime runtime flag_list booked maxmem core_list node_list file_list timelimit_minutes /;
 
+sub hasPermission($);
 sub parseSqueueLine($);
 sub runningJobInfo($);
 sub parseFinishedjobinfoLine($);
@@ -485,6 +496,14 @@ sub reorderNodeList($$);
 sub runPlotJobstats($);
 sub print_JobNotRun($);
 sub print_JobRun($);
+
+sub hasPermission($) {
+    # return TRUE if user has permission to check a job billed to this account
+    # the single argument is the account name
+    # we check the unix groups, slurm groups, or if a staff member
+    my $account = shift;
+    return scalar(grep /^$account$/, @user_groups) || scalar(grep /^$account$/, @user_slurm_groups) || $in_staff;
+}
 
 sub parseSqueueLine($) {
     # parse a single runningJobInfo-formatted line and return a hash
@@ -760,7 +779,7 @@ while ( 1 ) {
                 ++$jobcount_notrun;
                 next;
             }
-            if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
+            if (! hasPermission($ji->{account})) {
                 print STDERR "*** $ji->{account} is not one of your projects (jobid $jobid)\n";
                 next;
             }
@@ -771,7 +790,7 @@ while ( 1 ) {
                 ++$jobcount_notrun;
                 next;
             }
-            if (! scalar(grep /^$ji->{account}$/, @user_groups) and ! $in_staff) {
+            if (! hasPermission($ji->{account})) {
                 print STDERR "*** $ji->{account} is not one of your projects (jobid $jobid)\n";
                 next;
             }
