@@ -25,6 +25,8 @@ no lib split /:/ => $ENV {PERL5LIB};
 # DONE: static max RAM usage from finishedjobinfo, so make its default be to not use '-q'
 # DONE: switch to %fields hash instead of @fields array
 # DONE: shorter -h help, longer --help help
+# DONE: 20210506 use CLUSTER before SNIC_RESOURCE
+# DONE: new slurm 21.08.8 with new squeue format with -M
 # TODO: complete $o_plot_stdin to enable single call to plot_jobstats with multiple job info fed on stdin
 # TODO: YES implement Martin's efficiency statistic and include in output
 # TODO: YES together with above, provide deeper quantitative information about efficiency on request
@@ -34,7 +36,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2021-02-08";
+my $version = "2022-06-09";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -58,7 +60,7 @@ my %source_values = ( fji => "fji", finishedjobinfo => "fji", sacct => "sacct", 
 my %source_R_flags = ( fji => "--fji", squeue => "--squeue", sacct => "--sacct", db => "--db" );
 
 # options and user values
-my $o_cluster = $ENV{'SNIC_RESOURCE'} ? $ENV{'SNIC_RESOURCE'} : 'milou';  # -M
+my $o_cluster = $ENV{'CLUSTER'} ? $ENV{'CLUSTER'} : $ENV{'SNIC_RESOURCE'};  # -M
 my $o_running         = 0;  # -r | --running, also sets $o_source to "squeue"
 my $o_source          = "fji";
 my $o_plot            = 0;  # -p|--plot
@@ -528,7 +530,7 @@ sub runningJobInfo($) {
     # discover jobinfo for a single running job using SLURM squeue
     my $j = shift;
     # nearly identical to finishedjobinfo, by design
-    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j | sed '1d'";  # sed removes 'CLUSTER: cluster' that appears with the -M option
+    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j";
     return parseSqueueLine(qx($cmd));
 }
 
