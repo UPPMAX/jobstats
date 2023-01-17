@@ -107,7 +107,7 @@ node.types <- list(
     tintin.default  = "mem64GB",
     rackham         = c(mem128GB = 128, mem256GB = 256, mem1TB = 1024),
     rackham.default = "mem128GB",
-    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
+    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512, veryfat = 4096),
     snowy.default   = "mem128GB",
     bianca          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
     bianca.default  = "mem128GB",
