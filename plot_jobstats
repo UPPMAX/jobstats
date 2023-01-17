@@ -3,7 +3,7 @@
 # Read Uppmax jobstats files, analyse resource usage, and produce plots if
 # requested.
 #
-# Latest is available at https://github.com/douglasgscofield/uppmax
+# Latest is available at https://github.com/UPPMAX/jobstats
 #
 # DONE: add 'static' maxmem
 # DONE: added bianca info
@@ -15,7 +15,7 @@
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2020-12-02"
+.version <- "2023-01-17"
 .debug <- FALSE
 
 .enable_stdin <- FALSE
