@@ -542,7 +542,8 @@ sub parseFinishedjobinfoLine($) {
     return(0) if (! defined($keyvals));
     # note that null values "... nodes= ..." will result in no key in the hash
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
-    $h{jobname} = "'$h{jobname}'";
+    
+    $h{jobname} = not exists $h{jobname} ? 'not-set' : "'$h{jobname}'";
     $h{maxmemory_in_GiB} = 'not-set' if not exists $h{maxmemory_in_GiB};
     $h{maxmemory_node} = 'not-set' if not exists $h{maxmemory_node};
     return(\%h);
