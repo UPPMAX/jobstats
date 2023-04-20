@@ -1,8 +1,16 @@
 #!/usr/bin/perl
 
+
 # use the system perl (#! above) and therefore ignore the PERL5LIB variable
 # from http://computer-programming-forum.com/53-perl/74f89dee1a92c3e3.htm
 no lib split /:/ => $ENV {PERL5LIB};
+
+# when debugging, for example using 'perl -d:ptkdb',  use the following #! line and do not ignore PERL5LIB
+# replace the first line with
+#!/usr/bin/env perl
+# and comment the no lib split line out
+########no lib split /:/ => $ENV {PERL5LIB};
+
 
 # Discover Uppmax jobstats files, make preliminary analysis of resource usage,
 # and invoke plot_jobstats for further analysis and plot production.
@@ -27,6 +35,10 @@ no lib split /:/ => $ENV {PERL5LIB};
 # DONE: shorter -h help, longer --help help
 # DONE: 20210506 use CLUSTER before SNIC_RESOURCE
 # DONE: new slurm 21.08.8 with new squeue format with -M
+# DONE: add minimal qos= field recognition (pull it using squeue and handle it in finishedjobinfo)
+# TODO: add qos= to fields and plots
+# TODO: switch plot_jobstats args to be keyword-value pairs
+
 # TODO: complete $o_plot_stdin to enable single call to plot_jobstats with multiple job info fed on stdin
 # TODO: YES implement Martin's efficiency statistic and include in output
 # TODO: YES together with above, provide deeper quantitative information about efficiency on request
@@ -36,7 +48,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2023-03-30";
+my $version = "2023-04-20";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -530,7 +542,7 @@ sub runningJobInfo($) {
     # discover jobinfo for a single running job using SLURM squeue
     my $j = shift;
     # nearly identical to finishedjobinfo, by design
-    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j";
+    my $cmd = "squeue -o \"jobid=$j jobstate=%T username=%u account=%a nodes=%N procs=%C partition=%P qos=%q jobname=%j maxmemory_in_GiB=not-set maxmemory_node=not-set timelimit=%l submit_time=not-set start_time=%S end_time=%e runtime=%M margin=not-set queuetime=not-set\" -M $o_cluster -h -j $j";
     return parseSqueueLine(qx($cmd));
 }
 
@@ -543,7 +555,7 @@ sub parseFinishedjobinfoLine($) {
     # note that null values "... nodes= ..." will result in no key in the hash
     my %h = $keyvals =~ /([^ ]+)=([^ ]+)/g;
     
-    $h{jobname} = not exists $h{jobname} ? 'not-set' : "'$h{jobname}'";
+    $h{jobname} = (not exists $h{jobname}) ? 'not-set' : "'$h{jobname}'";
     $h{maxmemory_in_GiB} = 'not-set' if not exists $h{maxmemory_in_GiB};
     $h{maxmemory_node} = 'not-set' if not exists $h{maxmemory_node};
     return(\%h);
