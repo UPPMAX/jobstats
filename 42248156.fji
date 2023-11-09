@@ -1,0 +1,1 @@
+2023-10-30 18:02:35 jobid=42248156 jobstate=FAILED username=hayley account=naiss2023-5-315 nodes=r31 procs=20 partition=node qos=normal jobname=hdWGCNA_test_3q29 maxmemory_in_GiB=198.2 maxmemory_node=r31 timelimit=06:00:00 submit_time=2023-10-30T14:17:53 start_time=2023-10-30T17:40:52 end_time=2023-10-30T18:02:35 runtime=00:21:43 margin=05:38:17 queuetime=03:22:59
