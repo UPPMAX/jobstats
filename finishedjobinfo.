@@ -1,0 +1,813 @@
+#! /usr/bin/perl -w
+
+# use the system perl (#! above) and therefore ignore the PERL5LIB variable
+# from http://computer-programming-forum.com/53-perl/74f89dee1a92c3e3.htm
+# if not defined then do not print a warning
+no lib split /:/ => $ENV {PERL5LIB} // '';
+
+my $version = "2019-10-22";
+
+# Based on projinfo code, this script tells you about your old jobs
+# Written by Lennart.Karlsson@uppmax
+# Updated Jessica Nettelblad
+
+use strict;
+use POSIX qw(strftime);
+use Time::Local;
+use Getopt::Std;
+use User::pwent;
+
+no warnings "recursion";
+
+my $nr_of_cores_per_node = 8;
+#my $grantfile = "/etc/beowulf/grantfile";
+my $grantfile = "/sw/share/slurm/kalkyl/grantfile";
+#my $account_dir = "/var/log/slurm/accounting";
+my $account_dir = "/sw/share/slurm/kalkyl/accounting";
+my $squeue_pgm = "/usr/bin/squeue";
+my $scontrol_program = "/usr/bin/scontrol";
+my $sacct_program = "/usr/bin/sacct";
+
+my $userid = $<;
+my $username = getpwuid ($userid);
+$username = $username -> name;
+my $groupid = $(;
+my $groupname = getgrgid $groupid;
+my $in_staff = scalar(grep /^staff$/, map { scalar getgrgid $_ } split ' ', $groupid);
+my $now_date;	# Date in format YYYY-MM-DD
+my $now_clock;	# Time from 00:00:00 to 23:59:59
+my $now_utc;	# Time in seconds since epoch
+my ($now_year, $now_month, $now_day);	# Year A.D., months 1-12, day 1-31
+my ($endtime_utc, $endtime_date, $endtime_clock);
+my ($starttime_utc, $starttime_date, $starttime_clock);
+my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst);
+my $limit_in_s;
+my $limit_string;
+my $overview = 0;
+my $argv_count;
+my $endtime_is_now = 1;
+my $quiet_option = 0;
+my $verbose_option = 0;
+my $usage_sum = 0;
+my $allocation_sum = 0;
+my $group_is_project = 0;
+
+my %projecttime;
+my %projectgrant;
+my %activeproject;
+my %projectmembertime;
+my %job;
+my %parameter;
+my %project_to_check;
+my %user_to_check;
+my %jobids_to_check;  # if -j was used, jobid(s) to check have keys defined in this hash
+
+# Find the current time
+
+$now_utc = time ();
+($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime ($now_utc);
+$now_date = strftime "%Y-%m-%d", localtime ($now_utc);
+$now_clock = strftime "%H:%M:%S", localtime ($now_utc);
+$now_year = $year + 1900;	#Year A.D.
+$now_month = $mon + 1;		#Month (1-12)
+$now_day = $mday;		#Day (1-31)
+#print "Now is $now_utc, $now_date $now_clock $now_year $now_month $now_day\n";
+
+# Set default endtime
+
+$endtime_clock = $now_clock;
+$endtime_utc = $now_utc;
+$endtime_date = $now_date;
+
+# Set default starttime to 30 days ago
+$starttime_utc = $now_utc - 30 * 24 * 3600;
+($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime ($starttime_utc);
+$starttime_clock = "00:00:00";
+($sec, $min, $hour) = (0, 0, 0);
+
+## Set default starttime to a month ago, i.e. same date in last month
+#$starttime_clock = "00:00:00";
+#($sec, $min, $hour, $mday) = (0, 0, 0, $mday);
+#$mon--;
+#if ($mon < 0) {
+#	$mon = 11;
+#        $year--;
+#}
+## Set default starttime to the start of current month
+#$starttime_clock = "00:00:00";
+#($sec, $min, $hour, $mday) = (0, 0, 0, 1);
+
+while ($mday >= 1) { # Checking for illegal dates
+	eval {
+		timelocal ($sec, $min, $hour, $mday, $mon, $year);
+	} or print "";
+	if ($@ eq "") { # If this is a valid date
+		last;
+	}
+	elsif ($mday == 1) { # Too bad, we cannot have lower dates...
+		die "Error: We cannot look back one month from now. Please, error report this problem.\n";
+	}
+	else { # This month does probably not have this high number of days. Lower the month day value.\n"
+		$mday--;
+	}
+}
+
+$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+$starttime_date = strftime "%Y-%m-%d", localtime ($starttime_utc);
+
+
+# Groups shall not be interpreted as projects.
+$group_is_project = 0;
+
+
+# Read flags and parameters
+# -h help
+# -M <cluster_name> check for some other cluster
+# -q quiet, quick, shorter output
+# -m starting in the beginning of this calendar month
+# -y starting in the beginning of this calendar year
+# -s <time_value> starting at the specified time
+# -e <time_value> ending at the specified time
+# time_value can have values NOW, TODAY, hh:mm:ss, YYYY-MM-DD, YYYY-MM-DD/hh:mm:ss, YYYY-MM, YYYY, name of month
+sub usage {
+	print "Usage: ";
+	print "finishedjobinfo  [-h] [-M cluster_name] [-j jobid[,jobid...]] [-m|-y|-s YYYY-MM-DD[/hh:mm:ss]] [-e YYYY-MM-DD[/hh:mm:ss]] [project_or_user]...\n";
+	print "\t-h		Ask for help\n";
+	print "\t-M		Request data from a named other cluster\n";
+	print "\t-j		Request data for a specific jobid or jobids (comma-separated)\n";
+	print "\t-q		Quiet, quick, abbreviated output (no QOS or memory information)\n";
+	print "\t-v		Verbose, tells a little more\n";
+	print "\t-m		Start time is start of this month\n";
+	print "\t-y		Start time is start of this year\n";
+# Changed for Kalkyl
+	print "\t-s		Request a start time (default is a month back in time)\n";
+#	print "\t-s		Request a start time (default is start of current month)\n";
+	print "\t-e		Request an end time (default is now)\n";
+	print "\tTime can also be specified as NOW, TODAY, YYYY, YYYY-MM, YYYY-w<week number>, w<week number>, hh:mm:ss, or name of month\n";
+	print "\n";
+	print "Meaning of jobstate:\n";
+	print "CANCELLED	Job was cancelled, before or after it had started\n";
+	print "COMPLETED	Job run to finish, last command gave exit code 0\n";
+	print "FAILED		Job crashed or at least ended with an exit code that was not 0\n";
+	print "NODE_FAIL	One of your job nodes experienced a major problem, perhaps your job used all available memory\n";
+	print "TIMEOUT		Job exceeded the specified timelimit and was therefore terminated\n";
+}
+
+#$overview = 1 if $username eq "root" or $groupname eq "nsc";
+#$overview = 1 if $username eq "root" or $groupname eq "staff";
+$overview = 1 if $username eq "root" or $in_staff;
+use vars qw($opt_h $opt_q $opt_v $opt_m $opt_y $opt_s $opt_e $opt_M $opt_j);
+getopts ('hqvmys:e:M:j:');
+
+$argv_count = scalar @ARGV;
+if ($argv_count <= 0 and not $overview) { # Create default selection (not from projinfo)
+	$user_to_check {$username} = 1;
+}
+
+
+while (scalar @ARGV > 0) {
+	my $proj_or_user = shift;
+#	$proj_or_user  =~ tr/[A-Z]/[a-z]/;
+	my $pwd_entry = scalar (getpwnam $proj_or_user);
+
+	if ($group_is_project) {
+		if ($proj_or_user eq $username) {
+			die "Error: You cannot mix users and projects.\n" if scalar %project_to_check;
+			$user_to_check {$proj_or_user} = 1;
+		}
+		elsif ($proj_or_user eq $groupname) {
+			die "Error: You cannot mix users and projects.\n" if scalar %user_to_check;
+			$project_to_check {$proj_or_user} = 1;
+			$projecttime {$proj_or_user} = 0;
+		}
+		elsif (defined $pwd_entry) {
+			die "Please, do not check other users.\n" if not $overview;
+			die "Error: You cannot mix users and projects.\n" if scalar %project_to_check;
+			$user_to_check {$proj_or_user} = 1;
+		}
+		else {
+			die "Please, do not check other projects.\n" if not $overview;
+			die "Error: You cannot mix users and projects.\n" if scalar %user_to_check;
+			$project_to_check {$proj_or_user} = 1;
+			$projecttime {$proj_or_user} = 0;
+		}
+		next;
+	}
+
+	if (exists $projectgrant {$proj_or_user}) {
+		die "Error: You cannot mix users and projects.\n" if scalar %user_to_check;
+		$project_to_check {$proj_or_user} = 1;
+		$projecttime {$proj_or_user} = 0;
+	}
+	if (defined $pwd_entry) {
+		die "Please, do not check other users.\n" if not $overview and $proj_or_user ne $username;
+		die "Error: You cannot mix users and projects.\n" if scalar %project_to_check;
+		$user_to_check {$proj_or_user} = 1;
+	}
+	else { # Assume it is a project
+		die "Error: You cannot mix users and projects.\n" if scalar %user_to_check;
+		$project_to_check {$proj_or_user} = 1;
+		$projecttime {$proj_or_user} = 0;
+	}
+}
+
+# Check and resolve flags
+if (defined $opt_h) {
+	&usage ();
+	exit 0;
+}
+if (defined $opt_q) {
+	$quiet_option = 1;
+}
+if (defined $opt_v) {
+	$verbose_option = 1;
+}
+if (defined $opt_m) {
+	$year = $now_year - 1900;
+	$mon =  $now_month - 1;
+	$mday = 1;
+	($hour, $min, $sec) = (0, 0, 0);
+	$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+	$starttime_date = strftime "%Y-%m-%d", localtime ($starttime_utc);
+}
+
+if (defined $opt_M) {
+	$opt_M =~ tr/[A-Z]/[a-z]/;
+}
+else {        # What cluster is this?
+	open CONFIG, "$scontrol_program show conf 2>&1 |" or die "Error: Cannot find SLURM configuration.\n";
+	while (<CONFIG>) {
+		chomp;
+		my $line = lc $_;
+
+		if ($line =~ /^clustername\s+=\s+(\S+)\s*$/) {
+			$opt_M = $1;
+			last
+		}
+	}
+	close CONFIG;
+}
+
+$grantfile = "/sw/share/slurm/$opt_M/grantfile";
+$account_dir = "/sw/share/slurm/$opt_M/accounting";
+#if ($opt_M eq "halvan") {
+#	# Getting to start of this month
+#	$year = $now_year - 1900;
+#	$mon =  $now_month - 1;
+#	$mday = 1;
+#	($hour, $min, $sec) = (0, 0, 0);
+#	# Getting five months back in time from that
+#	$mon -= 5;
+#	if ($mon < 0) {
+#		$mon += 12;
+#		$year--;
+#	}
+#	$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+#	$starttime_date = strftime "%Y-%m-%d", localtime ($starttime_utc);
+#}
+
+if (defined $opt_j) {
+	if ($opt_j =~ /^([\d,]+)$/) {
+        %jobids_to_check = map { $_ => 1 } split (/,/, $1);
+		die "Error: Bad jobid(s) given on command line: $opt_j\n" if ! %jobids_to_check;
+	}
+	else {
+		die "Error: Bad jobid(s) given on command line: $opt_j\n";
+	}
+}
+
+if (defined $opt_y) {
+	$year = $now_year - 1900;
+	$mon =  0;
+	$mday = 1;
+	($hour, $min, $sec) = (0, 0, 0);
+	$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+	$starttime_date = strftime "%Y-%m-%d", localtime ($starttime_utc);
+}
+
+if (defined $opt_s) {
+	$opt_s  =~ tr/[A-Z]/[a-z]/;
+	$opt_s = &translate_abbreviations ($opt_s);
+	if ($opt_s =~ /^(\d\d\d\d)$/) { # Year given
+		$opt_s = "$1-01-01";
+	}
+	if ($opt_s =~ /^(\d\d\d\d)-(\d)$/) { # Year and abbreviated month number given
+		$opt_s = "$1-0$2-01";
+	}
+	if ($opt_s =~ /^(\d\d\d\d)-(\d\d)$/) { # Year and month given
+		$opt_s = "$1-$2-01";
+	}
+	if ($opt_s =~ /^w([\d]{1,2})$/) { # Week of this year given
+		$opt_s = "$now_year-w$1";
+	}	
+	if ($opt_s =~ /^(\d\d\d\d)-w([\d]{1,2})$/) { # Year and week given
+		my $year_of_start = $1;
+		my $weeknr_of_start = $2;
+		my $starttime_utc;
+
+		die "Error: There is now week $weeknr_of_start in year $year_of_start.\n" if $weeknr_of_start < 1;
+
+		$year = $year_of_start - 1900;
+		$mon = 0;	# Looking for week 1, somewhere in January
+		$mday = 1;	# Well, start to look at the first of January
+		($hour, $min, $sec) = (0, 0, 0);
+		$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+
+		
+		$starttime_utc = &find_start_of_week_1 ($starttime_utc);
+
+		# So, now go forward a number of weeks
+		$starttime_utc += 3600 * 24 * 7 * ($weeknr_of_start - 1);
+		$opt_s = strftime "%Y-%m-%d", localtime ($starttime_utc);
+
+		# Check for bad week number
+		if ($weeknr_of_start > 52) {
+			my $next_year = $year_of_start + 1;
+			my $next_year_utc;
+
+			$year = $next_year - 1900;
+			$mon = 0;	# Looking for week 1, somewhere in January
+			$mday = 1;	# Well, start to look at the first of January
+			($hour, $min, $sec) = (0, 0, 0);
+			$next_year_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+
+			$next_year_utc = &find_start_of_week_1 ($next_year_utc);
+			die "Error: There is no week $weeknr_of_start in year $year_of_start.\n" if $starttime_utc >= $next_year_utc;
+		}
+	}
+	if ($opt_s =~ /^(\d\d\d\d)-(\d\d)-(\d\d)$/) {
+		$year = $1 - 1900;
+		$mon = $2 - 1;
+		$mday = $3;
+		($hour, $min, $sec) = (0, 0, 0);
+	}
+	elsif ($opt_s =~ /^(\d\d\d\d)-(\d\d)-(\d\d)\/(\d|\d\d):(\d\d):(\d\d)$/) {
+		$year = $1 - 1900;
+		$mon =  $2 - 1;
+		$mday = $3;
+		($hour, $min, $sec) = ($4, $5, $6);
+	}
+	elsif ($opt_s =~ /^(\d+):(\d\d):(\d\d)$/) {
+		$year = $now_year - 1900;
+		$mon =  $now_month - 1;
+		$mday = $now_day;
+		($hour, $min, $sec) = ($1, $2, $3);
+	}
+	else {
+		die "Error: Bad time format ($opt_s) for start date.\n";
+	}
+		$starttime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+		$starttime_date = strftime "%Y-%m-%d", localtime ($starttime_utc);
+		$starttime_clock = strftime "%H:%M:%S", localtime ($starttime_utc);
+}
+	
+if (defined $opt_e) {
+	my $second_to_add = 0;  # Fix to move to midnight if necessary
+	$endtime_is_now = 0;
+
+	$opt_e  =~ tr/[A-Z]/[a-z]/;
+	$opt_e = &translate_abbreviations ($opt_e);
+	if ($opt_e =~ /^(\d\d\d\d)$/) { # Year given
+		$opt_e = "$1-12-31";
+	}
+	if ($opt_e =~ /^(\d\d\d\d)-(\d)$/) { # Year and abbreviated month number given
+		$opt_e = "$1-0$2";
+	}
+	if ($opt_e =~ /^(\d\d\d\d)-(\d\d)$/) { # Year and month given
+		my ($e_year, $e_month) = ($1, $2);
+		($year, $mon, $mday) = ($e_year - 1900, $e_month - 1, 31);
+		while ($mday >= 1) { # Checking for illegal dates
+			eval {
+				timelocal (0, 0, 0, $mday, $mon, $year);
+			} or print "";
+			if ($@ eq "") { # If this is a valid date
+				last;
+			}
+			$mday--;
+		}
+		$opt_e = "$e_year-$e_month-$mday";
+	}
+	if ($opt_e =~ /^w([\d]{1,2})$/) { # Week of this year given
+		$opt_e = "$now_year-w$1";
+	}	
+	if ($opt_e =~ /^(\d\d\d\d)-w([\d]{1,2})$/) { # Year and week given
+		my $year_of_end = $1;
+		my $weeknr_of_start = $2;
+		my $endtime_utc;
+
+		$year = $year_of_end - 1900;
+		$mon = 0;	# Looking for week 1, somewhere in January
+		$mday = 1;	# Well, start to look at the first of January
+		($hour, $min, $sec) = (0, 0, 0);
+		$endtime_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+		
+		$endtime_utc = &find_start_of_week_1 ($endtime_utc);
+
+		# So, now go forward a number of weeks
+		$endtime_utc += 3600 * 24 * 7 * ($weeknr_of_start - 1);
+		# And go forward to the end of week
+		$endtime_utc += 3600 * 24 * 6;
+		$opt_e = strftime "%Y-%m-%d", localtime ($endtime_utc);
+
+		# Check for bad week number
+		if ($weeknr_of_start > 52) {
+			my $next_year = $year_of_end + 1;
+			my $next_year_utc;
+
+			$year = $next_year - 1900;
+			$mon = 0;	# Looking for week 1, somewhere in January
+			$mday = 1;	# Well, start to look at the first of January
+			($hour, $min, $sec) = (0, 0, 0);
+			$next_year_utc = timelocal ($sec, $min, $hour, $mday, $mon, $year);
+
+			$next_year_utc = &find_start_of_week_1 ($next_year_utc);
+			die "Error: There is no week $weeknr_of_start in year $year_of_end.\n" if $endtime_utc >= $next_year_utc;
+		}
+	}
+	if ($opt_e =~ /^(\d\d\d\d)-(\d\d)-(\d\d)$/) {
+		$year = $1 - 1900;
+		$mon = $2 - 1;
+		$mday = $3;
+		($hour, $min, $sec) = (23, 59, 59);
+		$second_to_add = 1;
+	}
+	elsif ($opt_e =~ /^(\d\d\d\d)-(\d\d)-(\d\d)\/(\d|\d\d):(\d\d):(\d\d)$/) {
+		$year = $1 - 1900;
+		$mon =  $2 - 1;
+		$mday = $3;
+		($hour, $min, $sec) = ($4, $5, $6);
+	}
+	elsif ($opt_e =~ /^(\d+):(\d\d):(\d\d)$/) {
+		$year = $now_year - 1900;
+		$mon =  $now_month - 1;
+		$mday = $now_day;
+		($hour, $min, $sec) = ($1, $2, $3);
+	}
+	else {
+		die "Error: Bad time format ($opt_e) for end date.\n";
+	}
+	$endtime_utc = $second_to_add + timelocal ($sec, $min, $hour, $mday, $mon, $year);
+	$endtime_date = strftime "%Y-%m-%d", localtime ($endtime_utc);
+	$endtime_clock = strftime "%H:%M:%S", localtime ($endtime_utc);
+}
+
+die "Error: You have specified a start time coming after the end time.\n" if $starttime_utc > $endtime_utc;
+	
+
+# Extract data from grantfile.
+-d $account_dir or die "Error: Account information not found.\n";
+if (-e $grantfile) {
+	open GRANTFILE, "< $grantfile" or die "Error: Cannot read file $grantfile.\n";
+	while (<GRANTFILE>) {
+		chomp;
+#		$_  =~ tr/[A-Z]/[a-z]/;
+		my $line = $_;
+		next if /^\s*$/;	# Empty line
+		next if /^\s*#/;	# Comment
+		if (/^([^,]+),[^,]+,([^,]+),[^#]+#(.*)$/) {
+			my $projectname = $1;
+			my $grant = $2;
+			my $members = $3;
+			$projectgrant {$projectname} = $grant;
+			$projecttime {$projectname} = 0;
+			if ($overview or ($members =~ /^$username$|^$username\s|\s$username\s|\s$username$/)) {
+				$activeproject {$projectname} = 1;
+			}
+	#print "$projectname $grant $members.\n";
+	#print scalar %activeproject, "\n";
+		}
+		elsif (/^([^:]+):(\d+):.*:([^:]*)$/) {
+			my $projectname = $1;
+			my $grant = $2;
+			my $members = $3;
+			$projectgrant {$projectname} = $grant;
+			$projecttime {$projectname} = 0;
+			if ($overview or ($members =~ /^$username$|^$username,|,$username,|,$username$/)) {
+				$activeproject {$projectname} = 1;
+			}
+	#print "$projectname $grant $members.\n";
+	#print scalar %activeproject, "\n";
+		}
+		else { # Error in file
+			die "Error: Bad line in file $grantfile:\n\t$line\n";
+		}
+	}
+	close GRANTFILE;
+}
+else {
+	die "Error: Grantfile $grantfile is missing.\n";
+}
+
+# Get data from log files
+
+chdir $account_dir or die "Error: Could not change to directory $account_dir.\n";
+#foreach (`find . -type f`) {
+foreach (`find . -type f | sort`) {
+	chomp;
+	my $filepath = $_;
+#print "File path found is $filepath.\n";
+	my $filename = $filepath;
+	$filename =~ s/^.*\///g;
+#print "File name found is $filename.\n";
+
+	
+	if ($filename =~ /^(\d+-\d\d-\d\d)(.*)$/) {
+		my $date_of_name = $1;
+		my $file_suffix = $2;
+
+		next if $date_of_name lt $starttime_date;
+		next if $date_of_name gt $now_date;
+	#print "Date is $date_of_name.\n";
+		if ($file_suffix ne "") {
+			print STDERR "Error: Cannot convert file $filename for date $date_of_name.\n";
+			next;
+		}
+		open SLURMLOGFILE, "< $filepath" or die "Error: Cannot read file $filename.\n";
+		while (<SLURMLOGFILE>) {
+			chomp;
+#			$_  =~ tr/[A-Z]/[a-z]/;
+
+	# 2007-12-16 14:19:24 jobstate=COMPLETED jobid=23422 username=x_natsk account=SNIC007-07-62 start=1197806959 end=1197811164 submit=1197754907 nodes=n[170-171] procs=2 batch=yes jobname=test partition=neolith limit=600
+			my $logline = $_;
+			my ($line_date, $line_clock, $line_varstring);
+			my %jobinfo;
+			my $walltime;
+			my ($line_jobid, $line_jobstate, $line_username, $line_account, $line_start, $line_end, $line_nodes, $line_procs);
+			my $line_jobname;
+			my $line_limit;
+			my $line_partition;
+			my ($nr_of_nodes, $nr_of_coreseconds);
+	#print "\t$logline\n";
+			if (/^(\d+-\d\d-\d\d)\s+(\d+:\d\d:\d\d)\s+(.*)$/) {
+				$line_date = $1;
+				$line_clock = $2;
+				$line_varstring = $3;
+				$line_varstring =~ s/$/ /;
+	#print "$line_varstring\n";
+			}
+			else {
+				print STDERR "Error: Bad log line:\n\t$logline\n";
+				next;
+			}
+
+			next if $line_date lt $starttime_date;
+			next if $line_date gt $now_date;;
+			next if $line_date eq $starttime_date and $line_clock lt $starttime_clock;
+			next if $line_date eq $now_date and $line_clock gt $now_clock;
+
+			while ($line_varstring =~ /^\s*([^=]+)=(\S*)\s+(.*)$/) {
+				my $varname = $1;
+				my $varvalue = $2;
+				my $remainder = $3;
+				$jobinfo {$varname} = $varvalue;
+				$line_varstring = $remainder;
+	#print "$line_varstring\n";
+			}
+
+			($line_jobid, $line_jobstate, $line_username, $line_account, $line_start, $line_end, $line_nodes, $line_procs, $line_partition) =
+				($jobinfo {"jobid"}, $jobinfo {"jobstate"}, $jobinfo {"username"}, $jobinfo {"account"}, $jobinfo {"start"}, $jobinfo {"end"}, $jobinfo {"nodes"}, $jobinfo {"procs"}, $jobinfo {"partition"});
+			$line_jobname = "";
+			$line_jobname = $jobinfo {"jobname"} if exists $jobinfo {"jobname"};
+			$line_limit = 0;
+			$line_limit = $jobinfo {"limit"} if exists $jobinfo {"limit"};
+			$line_jobstate = lc $line_jobstate;
+
+			next if $line_jobid eq "";
+			next if defined $opt_j and ! exists $jobids_to_check {$line_jobid};
+			next if $line_jobstate eq "";
+			next if $line_username eq "";
+			next if $line_account eq "";
+			next if $line_start eq "";
+			next if $line_end eq "";
+			next if $line_start <= 0;
+			next if $line_end <= 0;
+			next if $line_partition eq "";
+
+
+			# Fixing bug due to new date format in 17.11
+#			next if $line_limit !~ /^\d+$/; # Old format, not compatible with Slurm 17.11
+			# Check if it's a timelimit from older Slurm version, format minutes 
+			if ($line_limit =~ /^\d+$/ ){
+#			    print "Old time limit format: $line_limit\n";
+			    $limit_in_s = $line_limit * 60; # Time limit in seconds
+			    $limit_string = &s_to_slurmtimestring ($limit_in_s); # Time limit in seconds converted to dd-hh:mm:ss
+			}
+			# Check if it's a timelimit for Slurm 17.11 or newer, format dd-hh:mm:ss
+			elsif($line_limit =~ /(\d|\d\d)?-?(\d\d):(\d\d):(\d\d)$/) {
+			    my $days = 0;
+			    if ($1) {$days = $1;}
+# Debug			    print "Days: $days, hours: $2, minutes: $3, seconds: $4 \t";
+			    my $is_sec = 0; # Maybe not needed
+			    $is_sec = 1 if $4 > 0; # Maybe not needed
+			    my $limit_in_minutes = $days*60*24+$2*60+$3+$is_sec;
+			    $limit_in_s = $limit_in_minutes * 60; 
+# Debug			    print "Minutes: $limit_in_minutes\tSeconds: $limit_in_s\n";
+			    $limit_string = $line_limit # Original time limit was alread dd-hh:mm:ss
+		        }
+			# Skip if time limit does not match known formats
+			else {
+			    print "If you see this, please contact UPPMAX support: Neither old or new format for time limit matched: $line_limit\n" ; 
+			    next;
+			}
+#			next if $line_limit !~ /^\d+$|^(d{1,2}-){0,1}d+:d+:d+$ / ; # Old format, not compatible with Slurm 17.11 
+			# End fixing bug
+
+
+			next if $line_start > $line_end;
+			
+### No free run any longer. lka /2009-06-12			next if $line_jobstate eq "node_fail";		# Free run if node breaks.
+			next if exists $job {$line_jobid};		# Already counted?
+			$line_start = $starttime_utc if $line_start < $starttime_utc;
+			$line_end = $endtime_utc if $line_end > $endtime_utc;
+			$walltime = $line_end - $line_start;
+# only in projinfo			next if $walltime <= 0;
+
+			$nr_of_nodes = &count_nodes ($line_nodes);
+			if ($line_partition eq "core" or $line_partition eq "devcore") {
+				my $nr_of_cores = $line_procs;
+				$nr_of_coreseconds = $nr_of_cores * $walltime;
+			}
+			else {
+				$nr_of_coreseconds = $nr_of_cores_per_node * $nr_of_nodes * $walltime;
+			}
+
+	# 2007-12-16 14:19:24 jobstate=COMPLETED jobid=23422 username=x_natsk account=SNIC007-07-62 start=1197806959 end=1197811164 submit=1197754907 nodes=n[170-171] procs=2 batch=yes jobname=test partition=neolith limit=600
+			if ((exists $project_to_check {$line_username} or exists $user_to_check {$line_username} or exists $project_to_check {$line_account} or exists $user_to_check {$line_account})
+			   or  ($overview and $argv_count <= 0 and not exists $project_to_check {$line_username} and not exists $user_to_check {$line_username} and not exists $project_to_check {$line_account} and not exists $user_to_check {$line_account})) {
+				my $queuetime = $jobinfo {"start"} - $jobinfo {"submit"};
+				my $runtime = $jobinfo {"end"} - $jobinfo {"start"};
+
+#				my $limit_in_s = $line_limit * 60; # Old time format, not compatible with Slurm 17.11. Set in code above for both cases.
+				my $margin_in_s = $limit_in_s - $runtime;
+
+				my $queuetime_string = &s_to_slurmtimestring ($queuetime);
+				my $runtime_string = &s_to_slurmtimestring ($runtime);
+#				my $limit_string = &s_to_slurmtimestring ($limit_in_s); # Time limit in seconds converted to dd-hh:mm:ss # Old code, before Slurm 17.11. Now already set above for both cases. 				
+				my $margin_string = &s_to_slurmtimestring ($margin_in_s);
+
+				my ($time_of_submit, $time_of_start, $time_of_end) = (&readable_time ($jobinfo {"submit"}), &readable_time ($jobinfo {"start"}), &readable_time ($jobinfo {"end"}));
+
+				my ($qos,$maxrss_in_kB,$maxrss_node) = ("unknown", -1, "unknown_node");
+				my $maxrss_in_GiB = -1;
+				my $maxrss_in_GiB_formatted = "-1";
+
+				next if $jobinfo {"start"} >= $endtime_utc or $jobinfo {"end"} <= $starttime_utc;
+
+				if ($quiet_option <= 0) {	# This is not quick or quiet, get all information
+					open SACCT, "$sacct_program -M $opt_M --noheader --parsable --format=JobID,MaxRSS,MaxRSSNode,qos -j $line_jobid 2>&1 |" or die "Error: Can not run program $sacct_program.\n";
+					while (<SACCT>) {
+						chomp;
+						my $line= $_;
+
+						if (/^\d+.*\|.*\|.*\|([^|]+)\|/) {
+							$qos = $1;
+						}
+						if (/^\d+.*\|(\d+)K\|([^|]+)\|/) {
+							my ($newmaxrss_in_kB, $newmaxrss_node) = ($1, $2);
+
+							($maxrss_in_kB, $maxrss_node) = ($newmaxrss_in_kB, $newmaxrss_node) if $newmaxrss_in_kB > $maxrss_in_kB;
+						}
+					}
+					close SACCT;
+				}
+
+				if ($maxrss_in_kB >= 0) {
+					$maxrss_in_GiB = $maxrss_in_kB / 1024 / 1024;
+					$maxrss_in_GiB_formatted  = sprintf "%0.1f", $maxrss_in_GiB;
+				}
+
+				$line_jobstate = uc $line_jobstate;
+				
+#print "DEBUG $_\n";
+				if ($quiet_option <= 0) {       # This is not quick or quiet, give all information
+					print "$line_date $line_clock jobid=$line_jobid jobstate=$line_jobstate username=$line_username account=$line_account nodes=$line_nodes procs=$line_procs partition=$line_partition qos=$qos jobname=$line_jobname maxmemory_in_GiB=$maxrss_in_GiB_formatted maxmemory_node=$maxrss_node timelimit=$limit_string submit_time=$time_of_submit start_time=$time_of_start end_time=$time_of_end runtime=$runtime_string margin=$margin_string queuetime=$queuetime_string\n";
+				}
+				else {
+					print "$line_date $line_clock jobid=$line_jobid jobstate=$line_jobstate username=$line_username account=$line_account nodes=$line_nodes procs=$line_procs partition=$line_partition jobname=$line_jobname timelimit=$limit_string submit_time=$time_of_submit start_time=$time_of_start end_time=$time_of_end runtime=$runtime_string margin=$margin_string queuetime=$queuetime_string\n";
+				}
+			}
+#next if $line_account ne "snic007-07-21";
+# only in projinfo			$projecttime {$line_account} = 0 if not exists $projecttime {$line_account};
+# only in projinfo			$projectmembertime {$line_account} {$line_username} = 0 if not exists $projectmembertime {$line_account} {$line_username};
+
+# only in projinfo			$projecttime {$line_account} += $nr_of_coreseconds;
+#print "DEBUG $line_jobid $line_start-$line_end $starttime_utc-$endtime_utc, projecttime = $nr_of_coreseconds, ", $projecttime {$line_account}, "\n";
+# only in projinfo			$projectmembertime {$line_account} {$line_username} += $nr_of_coreseconds;
+		}
+		close SLURMLOGFILE;
+	}
+}
+
+
+sub readable_time {
+	my ($time_utc) = @_;
+
+	return strftime "%Y-%m-%dT%H:%M:%S", localtime ($time_utc);
+}
+
+sub count_nodes {
+	my ($nodestring) = @_;
+
+	return 0 if $nodestring =~ /^\s*$/;		# Nothing left
+	return 1 if $nodestring =~ /^([A-Za-z0-9-]+\d+|halvan)$/;	# One left only
+	if ($nodestring =~ /^[A-Za-z0-9-]+\[([^\]]+)\]$/) {	# Handle number sequences
+		return &count_node_numbers ($1);
+	}
+	else {
+		print STDERR "Error: What kind of node string is this: $nodestring.\n";
+		return 0;
+	}
+}
+
+sub count_node_numbers {
+	my ($numberstring) = @_;
+
+	return 0 if $numberstring =~ /^\s*$/;		# Nothing left
+	return 1 if $numberstring =~ /^\d+$/;		# One left only
+	if ($numberstring =~ /^(\d+)-(\d+)$/) {	# A sequence of numbers
+		return 1 + $2 - $1;
+	}
+	elsif ($numberstring =~ /^([^,]+),(.*)$/) {
+		return &count_node_numbers ($1) + &count_node_numbers ($2);
+	}
+	else {
+		print STDERR "Error: What kind of number string is this: $numberstring.\n";
+		return 0;
+	}
+}
+
+sub translate_abbreviations {
+	my ($abbr) = @_;
+
+	return "$now_date/$now_clock" if $abbr eq "now";
+	return $now_date if $abbr eq "today";
+	return "$now_year-01" if $abbr =~ /^(jan|januari|january)$/;
+	return "$now_year-02" if $abbr =~ /^(feb|februari|february)$/;
+	return "$now_year-03" if $abbr =~ /^(mar|mars|march)$/;
+	return "$now_year-04" if $abbr =~ /^(apr|april)$/;
+	return "$now_year-05" if $abbr =~ /^(maj|may)$/;
+	return "$now_year-06" if $abbr =~ /^(jun|juni|june)$/;
+	return "$now_year-07" if $abbr =~ /^(jul|juli|july)$/;
+	return "$now_year-08" if $abbr =~ /^(aug|augusti|august)$/;
+	return "$now_year-09" if $abbr =~ /^(sep|september)$/;
+	return "$now_year-10" if $abbr =~ /^(okt|oct|oktober|october)$/;
+	return "$now_year-11" if $abbr =~ /^(nov|november)$/;
+	return "$now_year-12" if $abbr =~ /^(dec|december)$/;
+	return $abbr;
+}
+
+sub find_start_of_week_1 {
+	my ($starttime_utc) = @_;
+	my ($tmp_sec, $tmp_min, $tmp_hour, $tmp_mday, $tmp_mon, $tmp_year, $tmp_wday, $tmp_yday, $tmp_isdst);
+	my $weekday;
+	my $days_forward_from_newyearsday;
+
+	# First, find how many days forward in calender until beginning of week 1, then set time to that		
+	($tmp_sec, $tmp_min, $tmp_hour, $tmp_mday, $tmp_mon, $tmp_year, $tmp_wday, $tmp_yday, $tmp_isdst) = localtime ($starttime_utc);
+	$weekday = $tmp_wday;
+	if ($weekday == 0) {
+		$days_forward_from_newyearsday = 1; # To get to next monday
+	}
+	elsif ($weekday > 4) {
+		$days_forward_from_newyearsday = 8 - $weekday; # To get to next monday
+	}
+	else {
+		$days_forward_from_newyearsday = 1 - $weekday;
+	}
+	$starttime_utc += 3600 * 24 * $days_forward_from_newyearsday;
+	return $starttime_utc;
+}
+
+sub s_to_slurmtimestring {
+	my ($nr_of_seconds) =  @_;
+	my ($r_seconds, $r_minutes, $r_hours, $r_days) = (0, 0, 0, 0);
+	my $sign_prefix = "";
+
+	if ($nr_of_seconds < 0) {
+		$sign_prefix = "-";
+		$nr_of_seconds *= -1;
+	}
+
+#print "DEBUG converting $nr_of_seconds seconds...\n";
+	$r_seconds = $nr_of_seconds;
+	if ($r_seconds >= 60) {
+		$r_minutes = int ($r_seconds / 60);
+		$r_seconds -= $r_minutes * 60;
+	}
+	if ($r_minutes >= 60) {
+		$r_hours = int ($r_minutes / 60);
+		$r_minutes -= $r_hours * 60;
+	}
+	if ($r_hours >= 24) {
+		$r_days = int ($r_hours / 24);
+		$r_hours -= $r_days * 24;
+	}
+#print "DEBUG $r_days-$r_hours:$r_minutes:$r_seconds\n";
+
+	if ($r_days > 0) {
+		return sprintf "$sign_prefix%d-%2.2d:%2.2d:%2.2d", $r_days, $r_hours, $r_minutes, $r_seconds;
+	}
+	else {
+		return sprintf "$sign_prefix%2.2d:%2.2d:%2.2d", $r_hours, $r_minutes, $r_seconds;
+	}
+}

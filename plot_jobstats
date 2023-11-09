@@ -7,15 +7,19 @@
 #
 # DONE: add 'static' maxmem
 # DONE: added bianca info
+# DONE: add mem2TB node for snowy
+# DONE: add core-busy dot, depend on --cpu-free threshhold
+# DONE: add finishedjobinfo max-mem line even with extended jobstats
+# DONE: add finishedjobinfo max-mem line to end of plot only if it is greater than the greatest max-mem reported in the jobstats data
+# DONE: handle extended jobstats
 # TODO: implement receiving job info on stdin with --stdin 
-# TODO: handle extended jobstats
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
 # TODO: set limits below using arguments
 # TODO: better documentation
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2023-01-17"
+.version <- "2023-11-09"
 .debug <- FALSE
 
 .enable_stdin <- FALSE
@@ -47,12 +51,14 @@ do.plot <- TRUE  # produce the plot
 do.big.plot <- FALSE  # produce plot with twice the dimensions
 do.maxmem <- TRUE  # include trace of maxmem used by the process
 do.stdin <- FALSE  # read job-specific info from stdin rather than from the command line
+do.core.busy <- TRUE  # produce a blue dot for the number of busy cores, as deteremined by the cpu_free threshhold (settable by --cpu-free)
 col.GB <- "black"
 lty.GB <- 1  # memory lines
 lwd.GB <- 2  # memory lines
 col.core <- "blue"
 lty.core <- 2  # core usage lines
 lwd.core <- 2  # core usage lines
+pch.core.busy <- "-"
 maxmem.col <- "black"
 maxmem.lty <- 3  # for maxmem
 maxmem.lwd <- 1  # for maxmem
@@ -107,7 +113,7 @@ node.types <- list(
     tintin.default  = "mem64GB",
     rackham         = c(mem128GB = 128, mem256GB = 256, mem1TB = 1024),
     rackham.default = "mem128GB",
-    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512, veryfat = 4096),
+    snowy           = c(mem128GB = 128, mem256GB = 256, mem512GB = 512, mem2TB = 2048, veryfat = 4096),
     snowy.default   = "mem128GB",
     bianca          = c(mem128GB = 128, mem256GB = 256, mem512GB = 512),
     bianca.default  = "mem128GB",
@@ -142,6 +148,8 @@ processArgs <- function(args) {
                                      args         <- args[-1] },
             "--cpu-free" =         { cpu_free    <<- as.numeric(args[2]);
                                      args         <- args[-c(1, 2)] },
+            "--no-core-busy" =     { do.core.busy <<- FALSE;
+                                     args         <- args[-1] },
             break)
     }
 
@@ -337,16 +345,16 @@ produceFlags <- function(job) {
     # Here, we use cpu_free as a tolerance for determining whether a core is
     # busy or not.
     core.busy.even_once <- function(.busy_list) sum(.busy_list > cpu_free)
-    cores.busy <- apply(dat[, core.columns, drop = FALSE], 1,
-                        core.busy.even_once)
-    max.cores.busy <- max(cores.busy)
+    core.busy <- apply(dat[, core.columns, drop = FALSE], 1,
+                       core.busy.even_once)
+    max.core.busy <- max(core.busy)
     max.GB.avail <- max(dat$GB_LIMIT)
     if (is.null(job$maxmem) || is.na(job$maxmem) || job$maxmem == '.')  # if we don't have independent maxmem info
         job$maxmem = if (do.extended) max(dat$GB_MAX_USED) else max(dat$GB_USED)
     max.GB.used <- job$maxmem
     swap.used <- any(dat$GB_SWAP_USED > 0)
     core.GB <- max.GB.avail/num.cores
-    core.mem.used <- round(max.cores.busy * core.GB, 1)
+    core.mem.used <- round(max.core.busy * core.GB, 1)
 
     # Determine whether resources misused
 
@@ -373,7 +381,7 @@ produceFlags <- function(job) {
         else if (node.type.booked != node.type.needed)
             flag_node_type_overbooked <- TRUE
     }
-    fraction.cores.used <- max.cores.busy/num.cores
+    fraction.cores.used <- max.core.busy/num.cores
     fraction.mem.used <- max.GB.used/max.GB.avail
     flag_cores_overbooked <- fraction.cores.used < flag_cores_overbooked.fraction
     flag_mem_overbooked <- num.cores > 1 && fraction.mem.used < flag_mem_overbooked.fraction
@@ -446,7 +454,7 @@ produceFlags <- function(job) {
 
     if (flag_cores_overbooked)
         flag_list <- c(flag_list,
-                       createFlag(num.cores, max.cores.busy,
+                       createFlag(num.cores, max.core.busy,
                                   "cores booked", "cores_overbooked"))
 
     if (flag_mem_overbooked && include_memory_flag)
@@ -611,6 +619,9 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
     core.to.GB <- function(.x) return((.x/range.cores[2]) * range.GB[2])
     core.at <- core.to.GB(core.at)
     dat$core_ <- core.to.GB(apply(dat[, core.columns, drop = FALSE], 1, sum))
+    # core_busy_ is handled by counting, in each row, the number of cores > cpu_free
+    core.busy.cpu_free <- function(.busy_list) sum(.busy_list > cpu_free)
+    dat$core_busy_ <- core.to.GB(apply(dat[, core.columns, drop=FALSE], 1, core.busy.cpu_free) * 100) # count of cores for each time, scaled
     dat$swap_ <- ifelse(dat$GB_SWAP_USED > 0, swap.y, NA)
 
     # if just one entry, then give it some body by doubling it to make a line
@@ -650,7 +661,13 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
                 with(dat, annotate.page.max(x, pageout_, PAGE_OUT))
             }
         }
+        # add a line to the right side if the finishedjobinfo value is greater than the greatest GB_MAX_USED
+        # this might occur if the job increases its max RSS after the final polling visit
+        if (! is.null(this.maxmem) && this.maxmem > max(dat$GB_MAX_USED)) {
+            with(dat, lines(c(max(x), range.x[2]), c(this.maxmem, this.maxmem), col = maxmem.col, lwd = maxmem.lwd, lty = maxmem.lty))
+        }
     } else if (! is.null(this.maxmem)) {
+        # plot a line based on finishedjobinfo data
         abline(h = this.maxmem, col = maxmem.col, lwd = maxmem.lwd, lty = maxmem.lty)
     }
     mtext(paste0("Wall minutes since job start (5 min resolution, max ", range.x[2], " min)"),
@@ -658,6 +675,8 @@ plotJobstatsPanel <- function(job, node = "unknown", this.row = 0, this.col = 0)
     mtext(ifelse(this.col <= 1, paste0("GB used (max ", range.GB[2], " GB)"), ""),
           side = 2, line = axis1.line, las = 0, col = col.GB, cex = axis1.cex)
     with(dat, lines(x, core_, col = col.core, lwd = lwd.core, lty = lty.core))
+    if (do.core.busy)
+        with(dat, points(x, core_busy_, col = col.core, pch=pch.core.busy))
     axis(4, at = core.at, labels = core.labels, col.axis = col.core, cex.axis = axis.cex)
 
     if (this.col %in% c(0, 2)) # multiplanel axes
