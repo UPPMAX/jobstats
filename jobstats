@@ -36,6 +36,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # DONE: 20210506 use CLUSTER before SNIC_RESOURCE
 # DONE: new slurm 21.08.8 with new squeue format with -M
 # DONE: add minimal qos= field recognition (pull it using squeue and handle it in finishedjobinfo)
+# DONE: --version
 # TODO: add qos= to fields and plots
 # TODO: switch plot_jobstats args to be keyword-value pairs
 
@@ -48,7 +49,7 @@ no lib split /:/ => $ENV {PERL5LIB};
 # TODO: ? is there another, deeper, location for jobstats files we can check?
 #
 
-my $version = "2023-04-20";
+my $version = "2023-11-16";
 
 my $enable_multijobs = 1;
 my $enable_plot_stdin = 0;
@@ -97,6 +98,7 @@ my $o_hardprefix      = ""; # -X
 my $o_brief_help;           # -h or -?
 my $o_detailed_help;        # --help
 my $o_debug           = 0;  # --debug
+my $o_version         = 0;  # --version
 my @nodes;    # after unpacking finishedjobinfo or -n
 my @jobs;     # user-specified jobids
 
@@ -156,6 +158,7 @@ COMMAND-LINE OPTIONS
     --no-extended      Do *not* use extended jobstats information [default is to use it]
     --paging           Include PAGE_IN/PAGE_OUT statistics from extended jobstats [experimental]
     -d                 Produce a header for table output
+    --version          Produce version of this script and plot_jobstats
     -h | -?            Produce this help
     --help             Produce detailed help information
 
@@ -294,6 +297,8 @@ COMMAND-LINE OPTIONS
     --paging           Include PAGE_IN/PAGE_OUT statistics from extended jobstats [experimental]
 
     -d                 Produce a header for table output
+
+    --version          Produce version of this script and plot_jobstats, then exit
 
     -h | -?            Produce brief help
 
@@ -445,10 +450,36 @@ GetOptions("M=s"          => \$o_cluster,
            "P=s"          => \$o_plot_jobstats,
            "debug"        => \$o_debug,
            "no-multijobs" => \$o_no_multijobs,
+           "version"      => \$o_version,
            "h|?"          => \$o_brief_help,
            "help"         => \$o_detailed_help) or die "$brief_usage";
 die "$brief_usage" if $o_brief_help;
 die "$detailed_usage" if $o_detailed_help;
+
+# field order in output table
+my @field_order = qw/ jobid cluster jobstate user project jobname endtime runtime flag_list booked maxmem core_list node_list file_list timelimit_minutes /;
+
+sub hasPermission($);
+sub parseSqueueLine($);
+sub runningJobInfo($);
+sub parseFinishedjobinfoLine($);
+sub fieldNamesInOrder($);
+sub fieldContentsInOrder($);
+sub jobInfo($);
+sub parseNodes($);
+sub getJobstatsFiles($$@);
+sub getJobstatsFileCoreCount($);
+sub reorderNodeList($$);
+sub runPlotJobstats($);
+sub print_JobNotRun($);
+sub print_JobRun($);
+
+if ($o_version) {
+    say "$NAME\t$version";
+    my $NAME_PLOT_JOBSTATS = basename($o_plot_jobstats);
+    say "$NAME_PLOT_JOBSTATS\t" . runPlotJobstats("--version");
+    exit(0);
+}
 
 die "stdin to plot_jobstats not yet implemented" if $o_plot_stdin or $enable_plot_stdin;
 $o_plot_stdin = 0 if $o_no_multijobs;
@@ -492,24 +523,6 @@ my $no_jobstats_file = 0;
 
 #print STDERR "****EXTENDED $o_extended   PREFIX $PREFIX\n";
 
-
-# field order in output table
-my @field_order = qw/ jobid cluster jobstate user project jobname endtime runtime flag_list booked maxmem core_list node_list file_list timelimit_minutes /;
-
-sub hasPermission($);
-sub parseSqueueLine($);
-sub runningJobInfo($);
-sub parseFinishedjobinfoLine($);
-sub fieldNamesInOrder($);
-sub fieldContentsInOrder($);
-sub jobInfo($);
-sub parseNodes($);
-sub getJobstatsFiles($$@);
-sub getJobstatsFileCoreCount($);
-sub reorderNodeList($$);
-sub runPlotJobstats($);
-sub print_JobNotRun($);
-sub print_JobRun($);
 
 sub hasPermission($) {
     # return TRUE if user has permission to check a job billed to this account
@@ -671,6 +684,13 @@ sub runPlotJobstats($) {
     #     "--timelimit-minutes  INT"
     -f "$o_plot_jobstats" or die "\n***\n*** Script for plotting jobstats '$o_plot_jobstats' not available\n***";
     my @args;
+    if ($fields eq "--version") { # ask plot_jobstats its version
+        die "inconsistent version flags" if ! $o_version;
+        unshift @args, "--version";
+        my $return = qx($o_plot_jobstats @args);
+        chomp $return;
+        return($return);
+    }
     if ($o_plot_stdin) {
         # plot_jobstats received job-specific info from stdin
         unshift @args, "--stdin";

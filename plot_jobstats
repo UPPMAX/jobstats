@@ -12,6 +12,7 @@
 # DONE: add finishedjobinfo max-mem line even with extended jobstats
 # DONE: add finishedjobinfo max-mem line to end of plot only if it is greater than the greatest max-mem reported in the jobstats data
 # DONE: handle extended jobstats
+# DONE: --version
 # TODO: implement receiving job info on stdin with --stdin 
 # TODO: decide what to do about multiple-node jobs with respect to produceFlags()
 # TODO: set limits below using arguments
@@ -19,7 +20,7 @@
 #
 # see processArgs() for command-line argument structure
 
-.version <- "2023-11-09"
+.version <- "2023-11-16"
 .debug <- FALSE
 
 .enable_stdin <- FALSE
@@ -723,6 +724,11 @@ args <- commandArgs(trailingOnly = TRUE)
 if (.debug) { cat("after commandArgs()\n"); print(args) }
 
 if (.debug && exists('this.args')) args <- this.args
+
+if (args[1] == "--version") {
+    write(.version, stdout())
+    quit(save = "no", status = 0, runLast = FALSE)
+}
 
 job <- processArgs(args)
 
