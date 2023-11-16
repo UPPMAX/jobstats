@@ -6,7 +6,7 @@
 <pre><code>cluster-project-user-jobid.png</code></pre>
 <p>An example plot, this was named <code>milou-b2010042-douglas-8769275.png</code>:</p>
 <div class="figure">
-<img src="milou-b2010042-douglas-8769275.png" /><p class="caption"></p>
+<img src="milou-b2010042-douglas-8769275.png" />
 </div>
 <p>For multiple-node jobs, plots have a two-column format.</p>
 <p>Note that not all jobs will produce jobstats files, particularly if the job was cancelled or ran for less than 5 minutes. Also, if a job booked nodes inefficiently by not using nodes it asked for, jobstats files will not be available for the booked but unused nodes. For each such node the plot will show a blank panel containing the message 'node booked but unused'.</p>
@@ -23,10 +23,10 @@
 <p><strong>Mode 5, via stdin:</strong> <code>finishedjobinfo -q project | jobstats - -p</code></p>
 <p>Accept input on stdin formatted like <code>finishedjobinfo</code> output. Note the single dash <code>-</code> option given to <code>jobstats</code>; the long form of this option is <code>--stdin</code>. This mode can be especially useful if multiple queries of the same job information are expected. In this case, save the output of a single comprehensive <code>finishedjobinfo</code> query, and extract the parts of interest and present them to this script on stdin. For example, to produce analyses of all completed jobs in a project during the current calendar year, and produce separate tarballs analysing all jobs and providing jobstats plots for each user during this same period:</p>
 <pre class="sourceCode bash"><code class="sourceCode bash"><span class="ot">project=</span>myproj
-finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</span> <span class="ot">${project}</span>-year.txt
-<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> jobstats - <span class="kw">&gt;</span> <span class="ot">${project}</span>-completed-jobs.txt
-<span class="kw">for</span> u <span class="kw">in</span> user1 user2 user3 ; <span class="kw">do</span>
-    <span class="kw">grep</span> <span class="st">&quot;username=</span><span class="ot">${u}</span><span class="st">&quot;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> jobstats - -p <span class="kw">&gt;</span> <span class="ot">${u}</span>-jobs.txt
+<span class="kw">finishedjobinfo</span> -q -y <span class="ot">${project}</span> <span class="kw">&gt;</span> <span class="ot">${project}</span>-year.txt
+<span class="kw">grep</span> <span class="st">&#39;jobstat=COMPLETED&#39;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - <span class="kw">&gt;</span> <span class="ot">${project}</span>-completed-jobs.txt
+<span class="kw">for</span> <span class="kw">u</span> in user1 user2 user3 <span class="kw">;</span> <span class="kw">do</span>
+    <span class="kw">grep</span> <span class="st">&quot;username=</span><span class="ot">${u}</span><span class="st">&quot;</span> <span class="ot">${project}</span>-year.txt <span class="kw">|</span> <span class="kw">jobstats</span> - -p <span class="kw">&gt;</span> <span class="ot">${u}</span>-jobs.txt
     <span class="kw">tar</span> czf <span class="ot">${u}</span>-jobs.tar.gz <span class="ot">${u}</span>-jobs.txt *-<span class="ot">${project}</span>-<span class="ot">${u}</span>-*.png
 <span class="kw">done</span></code></pre>
 <h1 id="command-line-options">Command-Line Options</h1>
@@ -75,6 +75,8 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
                        is not produced.
 
     -d                 Produce a header for table output
+
+    --version          Produce version of jobstats and plot_jobstats, then exit
 
     -h | --help | -?   Produce detailed help information
 </code></pre>
@@ -125,6 +127,7 @@ finishedjobinfo -q -y <span class="ot">${project}</span> <span class="kw">&gt;</
 <p>An important part of <code>jobstats</code> output are usage flags. These provide indications that booked resources might have been underused, either processor cores, or memory, or both.</p>
 <p>In both plot and table output, flags are a comma-separated list of cautions regarding core and/or memory underutilisation. The appearance of a flag does not necessarily mean that resources were used incorrectly. It depends upon the tools being used and the contents of the SLURM header, and also depends upon the job profile. Because usage information is gathered every 5 minutes, higher transient usage of cores or memory may not be captured in the log files.</p>
 <p>Flags most likely to represent real overbooking of resources are <code>nodes_overbooked</code>, <code>overbooked</code>, <code>!!half_overbooked</code>, <code>!!severely_overbooked</code>, and <code>!!swap_used</code>.</p>
+<p>For jobs that require a larger node than the default, for example the <code>-C mem256GB</code> flag was used while booking the job with SLURM and more than 128GB was actually used by the job, then all of the flags pertaining to partial-node booking are disabled. It is not useful to issue such cautions because it is not possible to book just a portion of such nodes at UPPMAX.</p>
 <p>For multinode jobs, flags other than <code>nodes_overbooked</code> are determined based only on the usage of the first node. Multinode jobs require careful analysis so as to not waste resources unnecessarily, and it is a common mistake among beginning Uppmax users to book multiple nodes and run tools that cannot use more than the first. In this case, <code>nodes_overbooked</code> will appear.</p>
 <p>Some flags have a threshold below which they appear. The default format is generally <code>flag:value-booked:value-used</code>.</p>
 <ul>

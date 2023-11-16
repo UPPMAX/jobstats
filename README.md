@@ -144,6 +144,8 @@ of command line options.
 
     -d                 Produce a header for table output
 
+    --version          Produce version of jobstats and plot_jobstats, then exit
+
     -h | --help | -?   Produce detailed help information
 
 ~~~~
